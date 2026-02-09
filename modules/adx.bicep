@@ -1,7 +1,16 @@
+@description('Name of the ADX cluster.')
 param clusterName string
+
+@description('Azure region for all resources.')
 param location string
+
+@description('SKU name for the ADX cluster compute.')
 param skuName string = 'Standard_E2ads_v5'
+
+@description('SKU capacity (instance count) for the ADX cluster.')
 param skuCapacity int = 2
+
+@description('Force update tag for Kusto scripts.')
 param forceUpdateTag string = utcNow()
 
 resource cluster 'Microsoft.Kusto/clusters@2023-08-15' = {

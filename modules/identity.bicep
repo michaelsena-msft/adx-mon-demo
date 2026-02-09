@@ -2,7 +2,7 @@ param adxMonIdentityName string = 'id-adx-mon'
 param deployerIdentityName string = 'id-adx-mon-deployer'
 param location string
 param aksOidcIssuerUrl string
-param aksId string
+param aksClusterName string
 
 // User-Assigned Managed Identity for adx-mon workloads
 resource adxMonIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
@@ -47,7 +47,7 @@ resource deployerIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023
 
 // Give the deployer identity "Azure Kubernetes Service Cluster Admin Role" on the AKS cluster
 resource aksClusterAdminRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(aksId, deployerIdentity.id, '0ab0b1a8-8aac-4efd-b8c2-3ee1fb270be8')
+  name: guid(aksCluster.id, deployerIdentity.id, '0ab0b1a8-8aac-4efd-b8c2-3ee1fb270be8')
   scope: aksCluster
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '0ab0b1a8-8aac-4efd-b8c2-3ee1fb270be8')
@@ -57,8 +57,8 @@ resource aksClusterAdminRole 'Microsoft.Authorization/roleAssignments@2022-04-01
 }
 
 // Reference the existing AKS cluster for scoped role assignment
-resource aksCluster 'Microsoft.ContainerService/managedClusters@2024-01-01' existing = {
-  name: last(split(aksId, '/'))
+resource aksCluster 'Microsoft.ContainerService/managedClusters@2024-02-01' existing = {
+  name: aksClusterName
 }
 
 // Give the deployer identity "Contributor" on the resource group
