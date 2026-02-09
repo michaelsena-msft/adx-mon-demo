@@ -1,0 +1,343 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: adx-mon
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: collector
+  namespace: adx-mon
+  annotations:
+    azure.workload.identity/client-id: "__CLIENT_ID__"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: adx-mon:collector
+rules:
+  - apiGroups: [""]
+    resources: ["nodes/metrics", "nodes/proxy"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["namespaces", "pods", "nodes"]
+    verbs: ["get", "list", "watch"]
+  - nonResourceURLs: ["/metrics"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: adx-mon:collector
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: adx-mon:collector
+subjects:
+  - kind: ServiceAccount
+    name: collector
+    namespace: adx-mon
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: collector-config
+  namespace: adx-mon
+data:
+  config.toml: |
+    endpoint = 'https://ingestor.adx-mon.svc.cluster.local'
+    region = '__REGION__'
+    insecure-skip-verify = true
+    listen-addr = ':8080'
+    max-connections = 100
+    max-batch-size = 10000
+    storage-dir = '/mnt/data'
+    drop-metrics = []
+    disable-metrics-forwarding = false
+    wal-flush-interval-ms = 1000
+    lift-labels = [
+      { name = 'host' },
+      { name = 'cluster' },
+      { name = 'adxmon_pod', column = 'Pod' },
+      { name = 'adxmon_namespace', column = 'Namespace' },
+      { name = 'adxmon_container', column = 'Container' },
+    ]
+    lift-resources = [
+      { name = 'host' },
+      { name = 'cluster' },
+      { name = 'adxmon_pod', column = 'Pod' },
+      { name = 'adxmon_namespace', column = 'Namespace' },
+      { name = 'adxmon_container', column = 'Container' },
+    ]
+    [add-labels]
+      host = '$(HOSTNAME)'
+      cluster = '__CLUSTER_NAME__'
+    [prometheus-scrape]
+      database = 'Metrics'
+      default-drop-metrics = false
+      static-scrape-target = [
+        { host-regex = '.*', url = 'http://$(HOSTNAME):3100/metrics', namespace = 'adx-mon', pod = 'collector', container = 'collector' },
+        { host-regex = '.*', url = 'https://$(HOSTNAME):10250/metrics/cadvisor', namespace = 'kube-system', pod = 'kubelet', container = 'cadvisor' },
+        { host-regex = '.*', url = 'https://$(HOSTNAME):10250/metrics/resource', namespace = 'kube-system', pod = 'kubelet', container = 'resource' },
+      ]
+      scrape-interval = 30
+      scrape-timeout = 25
+      disable-metrics-forwarding = false
+      keep-metrics = []
+      drop-metrics = []
+    [[prometheus-remote-write]]
+      database = 'Metrics'
+      path = '/receive'
+      drop-metrics = []
+      disable-metrics-forwarding = false
+      [prometheus-remote-write.add-labels]
+    [otel-log]
+      lift-attributes = ['kusto.database', 'kusto.table']
+    [[host-log]]
+      parsers = ['json']
+      journal-target = [
+        { matches = [ '_SYSTEMD_UNIT=kubelet.service' ], database = 'Logs', table = 'Kubelet' }
+      ]
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: collector
+  namespace: adx-mon
+spec:
+  selector:
+    matchLabels:
+      adxmon: collector
+  template:
+    metadata:
+      labels:
+        adxmon: collector
+        azure.workload.identity/use: "true"
+      annotations:
+        adx-mon/scrape: "true"
+        adx-mon/port: "8080"
+        adx-mon/path: "/metrics"
+        adx-mon/log-destination: "Logs:Collector"
+        adx-mon/log-parsers: json
+    spec:
+      serviceAccountName: collector
+      automountServiceAccountToken: true
+      tolerations:
+        - key: CriticalAddonsOnly
+          operator: Exists
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: collector
+          image: ghcr.io/azure/adx-mon/collector:latest
+          command:
+            - /collector
+            - --config=/etc/config/config.toml
+            - --hostname=$(HOSTNAME)
+          env:
+            - name: LOG_LEVEL
+              value: "INFO"
+            - name: HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: GODEBUG
+              value: "http2client=0"
+          ports:
+            - containerPort: 8080
+              hostPort: 3100
+          resources:
+            requests:
+              cpu: 50m
+              memory: 100Mi
+            limits:
+              cpu: 500m
+              memory: 2000Mi
+          volumeMounts:
+            - name: ssl-certs
+              mountPath: /etc/ssl/certs
+              readOnly: true
+            - name: pki-ca-certs
+              mountPath: /etc/pki/ca-trust/extracted
+              readOnly: true
+            - name: config-volume
+              mountPath: /etc/config
+              readOnly: true
+            - name: storage
+              mountPath: /mnt/data
+            - name: varlog
+              mountPath: /var/log
+              readOnly: true
+            - name: runlog
+              mountPath: /run/log
+              readOnly: true
+            - name: varlibdockercontainers
+              mountPath: /var/lib/docker/containers
+              readOnly: true
+            - name: etcmachineid
+              mountPath: /etc/machine-id
+              readOnly: true
+      volumes:
+        - name: ssl-certs
+          hostPath:
+            path: /etc/ssl/certs
+        - name: pki-ca-certs
+          hostPath:
+            path: /etc/pki/ca-trust/extracted
+        - name: config-volume
+          configMap:
+            name: collector-config
+        - name: storage
+          hostPath:
+            path: /mnt/collector
+        - name: varlog
+          hostPath:
+            path: /var/log
+        - name: runlog
+          hostPath:
+            path: /run/log
+        - name: varlibdockercontainers
+          hostPath:
+            path: /var/lib/docker/containers
+        - name: etcmachineid
+          hostPath:
+            path: /etc/machine-id
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: collector-singleton-config
+  namespace: adx-mon
+data:
+  config.toml: |
+    endpoint = 'https://ingestor.adx-mon.svc.cluster.local'
+    region = '__REGION__'
+    insecure-skip-verify = true
+    listen-addr = ':8080'
+    max-connections = 100
+    max-batch-size = 10000
+    storage-dir = '/mnt/data'
+    drop-metrics = []
+    disable-metrics-forwarding = false
+    wal-flush-interval-ms = 1000
+    lift-labels = [
+      { name = 'host' },
+      { name = 'cluster' },
+      { name = 'adxmon_pod', column = 'Pod' },
+      { name = 'adxmon_namespace', column = 'Namespace' },
+      { name = 'adxmon_container', column = 'Container' },
+    ]
+    lift-resources = [
+      { name = 'host' },
+      { name = 'cluster' },
+      { name = 'adxmon_pod', column = 'Pod' },
+      { name = 'adxmon_namespace', column = 'Namespace' },
+      { name = 'adxmon_container', column = 'Container' },
+    ]
+    [add-labels]
+      host = '$(HOSTNAME)'
+      cluster = '__CLUSTER_NAME__'
+    [prometheus-scrape]
+      database = 'Metrics'
+      default-drop-metrics = false
+      disable-discovery = true
+      static-scrape-target = [
+        { host-regex = '.*', url = 'https://kubernetes.default.svc/metrics', namespace = 'kube-system', pod = 'kube-apiserver', container = 'kube-apiserver' },
+      ]
+      scrape-interval = 30
+      scrape-timeout = 25
+      disable-metrics-forwarding = false
+      keep-metrics = []
+      drop-metrics = []
+    [otel-log]
+      lift-attributes = ['kusto.database', 'kusto.table']
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: collector-singleton
+  namespace: adx-mon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      adxmon: collector-singleton
+  template:
+    metadata:
+      labels:
+        adxmon: collector-singleton
+        azure.workload.identity/use: "true"
+      annotations:
+        adx-mon/scrape: "true"
+        adx-mon/port: "8080"
+        adx-mon/path: "/metrics"
+        adx-mon/log-destination: "Logs:Collector"
+        adx-mon/log-parsers: json
+    spec:
+      serviceAccountName: collector
+      automountServiceAccountToken: true
+      containers:
+        - name: collector
+          image: ghcr.io/azure/adx-mon/collector:latest
+          command:
+            - /collector
+            - --config=/etc/config/config.toml
+            - --hostname=$(HOSTNAME)
+          env:
+            - name: LOG_LEVEL
+              value: "INFO"
+            - name: HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: GODEBUG
+              value: "http2client=0"
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: 50m
+              memory: 100Mi
+            limits:
+              cpu: 500m
+              memory: 2000Mi
+          volumeMounts:
+            - name: ssl-certs
+              mountPath: /etc/ssl/certs
+              readOnly: true
+            - name: pki-ca-certs
+              mountPath: /etc/pki/ca-trust/extracted
+              readOnly: true
+            - name: config-volume
+              mountPath: /etc/config
+              readOnly: true
+            - name: storage
+              mountPath: /mnt/data
+            - name: varlog
+              mountPath: /var/log
+              readOnly: true
+            - name: varlibdockercontainers
+              mountPath: /var/lib/docker/containers
+              readOnly: true
+      volumes:
+        - name: ssl-certs
+          hostPath:
+            path: /etc/ssl/certs
+        - name: pki-ca-certs
+          hostPath:
+            path: /etc/pki/ca-trust/extracted
+        - name: config-volume
+          configMap:
+            name: collector-singleton-config
+        - name: storage
+          emptyDir: {}
+        - name: varlog
+          hostPath:
+            path: /var/log
+        - name: varlibdockercontainers
+          hostPath:
+            path: /var/lib/docker/containers

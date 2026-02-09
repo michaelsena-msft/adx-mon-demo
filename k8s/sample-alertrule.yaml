@@ -1,0 +1,16 @@
+apiVersion: adx-mon.azure.com/v1
+kind: AlertRule
+metadata:
+  name: pod-restart-alert
+  namespace: adx-mon
+spec:
+  database: Metrics
+  interval: 5m
+  query: |
+    KubeStatePodStatusContainerRestartCount
+    | where Timestamp > ago(10m)
+    | invoke prom_delta()
+    | summarize Restarts=sum(Value) by Namespace=tostring(Labels.namespace), Pod=tostring(Labels.pod)
+    | where Restarts > 3
+  destination: "adx-mon-alerts"
+  autoMitigateAfter: "15m"
