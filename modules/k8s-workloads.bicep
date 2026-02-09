@@ -7,9 +7,6 @@ param location string
 @description('Name of the AKS cluster')
 param aksClusterName string
 
-@description('Resource group containing the AKS cluster')
-param aksResourceGroup string
-
 @description('ADX cluster URI')
 param adxUri string
 
@@ -52,7 +49,7 @@ resource applyK8sManifests 'Microsoft.Resources/deploymentScripts@2023-08-01' = 
     forceUpdateTag: forceUpdateTag
     environmentVariables: [
       { name: 'AKS_CLUSTER', value: aksClusterName }
-      { name: 'AKS_RG', value: aksResourceGroup }
+      { name: 'AKS_RG', value: resourceGroup().name }
       { name: 'ADX_URL', value: adxUri }
       { name: 'CLIENT_ID', value: adxMonClientId }
       { name: 'CLUSTER_NAME', value: clusterName }

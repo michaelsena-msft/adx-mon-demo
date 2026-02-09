@@ -3,7 +3,7 @@ param location string
 param skuName string = 'Standard'
 
 @description('Principal IDs to grant Grafana Admin role')
-param adminPrincipalIds array = []
+param adminPrincipalIds string[] = []
 
 @description('Principal type for admin principals (User or Group)')
 param adminPrincipalType string = 'User'

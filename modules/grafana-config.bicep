@@ -1,11 +1,24 @@
 // Configures Grafana with ADX datasource (no dashboard deployment)
+
+@description('Azure region for the deployment script resource.')
 param location string
+
+@description('Name of the Grafana workspace.')
 param grafanaName string
-param grafanaResourceGroup string
+
+@description('ADX cluster URI.')
 param adxUri string
+
+@description('Name of the ADX cluster.')
 param adxClusterName string
+
+@description('Resource ID of the deployer managed identity.')
 param deployerIdentityId string
+
+@description('Principal ID of the deployer managed identity.')
 param deployerPrincipalId string
+
+@description('Force re-run of the deployment script.')
 param forceUpdateTag string = utcNow()
 
 resource grafana 'Microsoft.Dashboard/grafana@2023-09-01' existing = {
@@ -43,7 +56,7 @@ resource configScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
     forceUpdateTag: forceUpdateTag
     environmentVariables: [
       { name: 'GRAFANA_NAME', value: grafanaName }
-      { name: 'GRAFANA_RG', value: grafanaResourceGroup }
+      { name: 'GRAFANA_RG', value: resourceGroup().name }
       { name: 'ADX_URL', value: adxUri }
       { name: 'ADX_NAME', value: adxClusterName }
     ]

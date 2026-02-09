@@ -31,7 +31,7 @@ param adxSkuName string = 'Standard_E2ads_v5'
 param adxSkuCapacity int = 2
 
 @description('User principal (object) IDs to grant ADX Viewer and Grafana Admin access.')
-param userPrincipalIds array = []
+param userPrincipalIds string[] = []
 
 @description('Tenant ID for user principals (defaults to current tenant).')
 param userTenantId string = tenant().tenantId
@@ -81,7 +81,7 @@ module identity 'modules/identity.bicep' = {
   params: {
     location: location
     aksOidcIssuerUrl: aks.outputs.oidcIssuerUrl
-    aksId: aks.outputs.aksId
+    aksClusterName: aks.outputs.aksName
   }
 }
 
@@ -122,7 +122,6 @@ module k8sWorkloads 'modules/k8s-workloads.bicep' = {
   params: {
     location: location
     aksClusterName: aks.outputs.aksName
-    aksResourceGroup: rg.name
     adxUri: adx.outputs.adxUri
     adxMonClientId: identity.outputs.adxMonIdentityClientId
     clusterName: aksClusterName
@@ -143,7 +142,6 @@ module grafanaConfig 'modules/grafana-config.bicep' = {
   params: {
     location: location
     grafanaName: grafana.outputs.grafanaName
-    grafanaResourceGroup: rg.name
     adxUri: adx.outputs.adxUri
     adxClusterName: adx.outputs.adxName
     deployerIdentityId: identity.outputs.deployerIdentityId
