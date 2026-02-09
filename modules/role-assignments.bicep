@@ -13,21 +13,21 @@ param viewerPrincipalIds string[] = []
 @description('Tenant ID for viewer principals')
 param viewerTenantId string = tenant().tenantId
 
-resource adx 'Microsoft.Kusto/clusters@2023-08-15' existing = {
+resource adx 'Microsoft.Kusto/clusters@2024-04-13' existing = {
   name: adxClusterName
 }
 
-resource metricsDb 'Microsoft.Kusto/clusters/databases@2023-08-15' existing = {
+resource metricsDb 'Microsoft.Kusto/clusters/databases@2024-04-13' existing = {
   parent: adx
   name: 'Metrics'
 }
 
-resource logsDb 'Microsoft.Kusto/clusters/databases@2023-08-15' existing = {
+resource logsDb 'Microsoft.Kusto/clusters/databases@2024-04-13' existing = {
   parent: adx
   name: 'Logs'
 }
 
-resource adxMonMetricsAdmin 'Microsoft.Kusto/clusters/databases/principalAssignments@2023-08-15' = {
+resource adxMonMetricsAdmin 'Microsoft.Kusto/clusters/databases/principalAssignments@2024-04-13' = {
   parent: metricsDb
   name: guid(metricsDb.id, adxMonAppId, 'Admin')
   properties: {
@@ -38,7 +38,7 @@ resource adxMonMetricsAdmin 'Microsoft.Kusto/clusters/databases/principalAssignm
   }
 }
 
-resource adxMonLogsAdmin 'Microsoft.Kusto/clusters/databases/principalAssignments@2023-08-15' = {
+resource adxMonLogsAdmin 'Microsoft.Kusto/clusters/databases/principalAssignments@2024-04-13' = {
   parent: logsDb
   name: guid(logsDb.id, adxMonAppId, 'Admin')
   properties: {
@@ -49,7 +49,7 @@ resource adxMonLogsAdmin 'Microsoft.Kusto/clusters/databases/principalAssignment
   }
 }
 
-resource grafanaMetricsViewer 'Microsoft.Kusto/clusters/databases/principalAssignments@2023-08-15' = {
+resource grafanaMetricsViewer 'Microsoft.Kusto/clusters/databases/principalAssignments@2024-04-13' = {
   parent: metricsDb
   name: guid(metricsDb.id, grafanaPrincipalId, 'Viewer')
   properties: {
@@ -60,7 +60,7 @@ resource grafanaMetricsViewer 'Microsoft.Kusto/clusters/databases/principalAssig
   }
 }
 
-resource grafanaLogsViewer 'Microsoft.Kusto/clusters/databases/principalAssignments@2023-08-15' = {
+resource grafanaLogsViewer 'Microsoft.Kusto/clusters/databases/principalAssignments@2024-04-13' = {
   parent: logsDb
   name: guid(logsDb.id, grafanaPrincipalId, 'Viewer')
   properties: {
@@ -71,7 +71,7 @@ resource grafanaLogsViewer 'Microsoft.Kusto/clusters/databases/principalAssignme
   }
 }
 
-resource userMetricsViewer 'Microsoft.Kusto/clusters/databases/principalAssignments@2023-08-15' = [for (principalId, i) in viewerPrincipalIds: {
+resource userMetricsViewer 'Microsoft.Kusto/clusters/databases/principalAssignments@2024-04-13' = [for (principalId, i) in viewerPrincipalIds: {
   parent: metricsDb
   name: guid(metricsDb.id, principalId, 'Viewer')
   properties: {
@@ -82,7 +82,7 @@ resource userMetricsViewer 'Microsoft.Kusto/clusters/databases/principalAssignme
   }
 }]
 
-resource userLogsViewer 'Microsoft.Kusto/clusters/databases/principalAssignments@2023-08-15' = [for (principalId, i) in viewerPrincipalIds: {
+resource userLogsViewer 'Microsoft.Kusto/clusters/databases/principalAssignments@2024-04-13' = [for (principalId, i) in viewerPrincipalIds: {
   parent: logsDb
   name: guid(logsDb.id, principalId, 'Viewer')
   properties: {

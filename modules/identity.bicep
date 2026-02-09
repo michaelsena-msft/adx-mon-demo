@@ -5,13 +5,13 @@ param aksOidcIssuerUrl string
 param aksClusterName string
 
 // User-Assigned Managed Identity for adx-mon workloads
-resource adxMonIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+resource adxMonIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
   name: adxMonIdentityName
   location: location
 }
 
 // Federated identity credential for ingestor service account
-resource federatedIngestor 'Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials@2023-01-31' = {
+resource federatedIngestor 'Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials@2024-11-30' = {
   name: 'federated-ingestor'
   parent: adxMonIdentity
   properties: {
@@ -24,7 +24,7 @@ resource federatedIngestor 'Microsoft.ManagedIdentity/userAssignedIdentities/fed
 }
 
 // Federated identity credential for collector service account (serial to avoid concurrent write error)
-resource federatedCollector 'Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials@2023-01-31' = {
+resource federatedCollector 'Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials@2024-11-30' = {
   name: 'federated-collector'
   parent: adxMonIdentity
   dependsOn: [
@@ -40,7 +40,7 @@ resource federatedCollector 'Microsoft.ManagedIdentity/userAssignedIdentities/fe
 }
 
 // User-Assigned Managed Identity for deployment scripts
-resource deployerIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+resource deployerIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
   name: deployerIdentityName
   location: location
 }
@@ -57,7 +57,7 @@ resource aksClusterAdminRole 'Microsoft.Authorization/roleAssignments@2022-04-01
 }
 
 // Reference the existing AKS cluster for scoped role assignment
-resource aksCluster 'Microsoft.ContainerService/managedClusters@2024-02-01' existing = {
+resource aksCluster 'Microsoft.ContainerService/managedClusters@2024-09-01' existing = {
   name: aksClusterName
 }
 
