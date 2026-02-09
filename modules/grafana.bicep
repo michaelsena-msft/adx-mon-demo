@@ -8,7 +8,7 @@ param adminPrincipalIds string[] = []
 @description('Principal type for admin principals (User or Group)')
 param adminPrincipalType string = 'User'
 
-resource grafana 'Microsoft.Dashboard/grafana@2023-09-01' = {
+resource grafana 'Microsoft.Dashboard/grafana@2024-10-01' = {
   name: grafanaName
   location: location
   sku: {

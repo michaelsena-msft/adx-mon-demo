@@ -21,7 +21,7 @@ param deployerPrincipalId string
 @description('Force re-run of the deployment script.')
 param forceUpdateTag string = utcNow()
 
-resource grafana 'Microsoft.Dashboard/grafana@2023-09-01' existing = {
+resource grafana 'Microsoft.Dashboard/grafana@2024-10-01' existing = {
   name: grafanaName
 }
 
