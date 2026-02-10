@@ -36,93 +36,66 @@
 
 Below is a simplified architecture diagram showing both approaches and the components involved.
 
-```
-┌──────────────────────────────────────────────────────────────────────────────────────┐
-│                              Azure Subscription                                      │
-│                                                                                      │
-│   ╔══════════════════════════════════════════════════════════════════════════════╗    │
-│   ║                     AKS Cluster(s)                                          ║    │
-│   ║                                                                              ║    │
-│   ║   ┌──────────────────────────────┐  ┌──────────────────────────────────┐    ║    │
-│   ║   │     adx-mon Stack            │  │     Managed Prometheus Stack     │    ║    │
-│   ║   │                              │  │                                  │    ║    │
-│   ║   │  ┌────────────────────────┐  │  │  ┌────────────────────────────┐  │    ║    │
-│   ║   │  │ Collector (DaemonSet)  │  │  │  │ ama-metrics (DaemonSet)    │  │    ║    │
-│   ║   │  │  • cAdvisor scrape     │  │  │  │  • cAdvisor scrape         │  │    ║    │
-│   ║   │  │  • kubelet scrape      │  │  │  │  • kubelet scrape          │  │    ║    │
-│   ║   │  │  • node logs           │  │  │  │  • node-exporter scrape    │  │    ║    │
-│   ║   │  │  • pod annotation      │  │  │  │  • kube-state-metrics      │  │    ║    │
-│   ║   │  │    discovery            │  │  │  └────────────┬───────────────┘  │    ║    │
-│   ║   │  └────────────┬───────────┘  │  │               │                  │    ║    │
-│   ║   │               │              │  │  ┌────────────┴───────────────┐  │    ║    │
-│   ║   │  ┌────────────┴───────────┐  │  │  │ ama-metrics (Singleton)   │  │    ║    │
-│   ║   │  │ Collector (Singleton)  │  │  │  │  • kube-apiserver scrape  │  │    ║    │
-│   ║   │  │  • kube-apiserver      │  │  │  └────────────┬───────────────┘  │    ║    │
-│   ║   │  └────────────┬───────────┘  │  │               │                  │    ║    │
-│   ║   │               │              │  │               │                  │    ║    │
-│   ║   │  ┌────────────┴───────────┐  │  └───────────────┼──────────────────┘    ║    │
-│   ║   │  │ kube-state-metrics     │  │                  │                       ║    │
-│   ║   │  │  (2 shards)            │  │                  │                       ║    │
-│   ║   │  └────────────┬───────────┘  │                  │                       ║    │
-│   ║   │               │              │                  │                       ║    │
-│   ║   │  ┌────────────┴───────────┐  │                  │                       ║    │
-│   ║   │  │ Ingestor (StatefulSet) │  │                  │                       ║    │
-│   ║   │  │  • batches & writes    │  │                  │                       ║    │
-│   ║   │  └────────────┬───────────┘  │                  │                       ║    │
-│   ║   │               │              │                  │                       ║    │
-│   ║   └───────────────┼──────────────┘                  │                       ║    │
-│   ╚═══════════════════╪═════════════════════════════════╪═══════════════════════╝    │
-│                       │                                 │                            │
-│                       ▼                                 ▼                            │
-│   ┌───────────────────────────────┐  ┌──────────────────────────────────────────┐   │
-│   │   Azure Data Explorer (ADX)   │  │   Azure Monitor Workspace (AMW)          │   │
-│   │                               │  │                                          │   │
-│   │  ┌─────────────────────────┐  │  │  ┌──────────────────────────────────┐    │   │
-│   │  │ Metrics DB              │  │  │  │ Prometheus Metrics Store         │    │   │
-│   │  │  • ~600+ auto tables    │  │  │  │  • PromQL queryable             │    │   │
-│   │  │  • 365d retention       │  │  │  │  • 18-month retention           │    │   │
-│   │  │  • 31d hot cache        │  │  │  │  • Recording rules              │    │   │
-│   │  │  • KQL queryable        │  │  │  │  • Alert rules (PromQL)         │    │   │
-│   │  └─────────────────────────┘  │  │  └──────────────────────────────────┘    │   │
-│   │  ┌─────────────────────────┐  │  │                                          │   │
-│   │  │ Logs DB                 │  │  │  Supporting Resources:                   │   │
-│   │  │  • Kubelet logs         │  │  │  ┌──────────────────────────────────┐    │   │
-│   │  │  • App container logs   │  │  │  │ DCR (Data Collection Rule)       │    │   │
-│   │  │  • Component logs       │  │  │  │  • Defines what to scrape       │    │   │
-│   │  └─────────────────────────┘  │  │  │  • Filtering / relabeling       │    │   │
-│   │                               │  │  └──────────────────────────────────┘    │   │
-│   │  KQL Functions:               │  │  ┌──────────────────────────────────┐    │   │
-│   │  • prom_delta()               │  │  │ DCRA (DCR Association)           │    │   │
-│   │  • Custom user functions      │  │  │  • Links DCR → AKS cluster      │    │   │
-│   │  • AlertRule CRDs (KQL)       │  │  └──────────────────────────────────┘    │   │
-│   └───────────────────┬───────────┘  │  ┌──────────────────────────────────┐    │   │
-│                       │              │  │ DCE (Data Collection Endpoint)    │    │   │
-│                       │              │  │  • Ingestion endpoint URL        │    │   │
-│                       │              │  └──────────────────────────────────┘    │   │
-│                       │              └──────────────────┬───────────────────────┘   │
-│                       │                                 │                            │
-│                       ▼                                 ▼                            │
-│   ┌──────────────────────────────────────────────────────────────────────────────┐  │
-│   │                        Managed Grafana                                       │  │
-│   │                                                                              │  │
-│   │   adx-mon path:                    Managed Prometheus path:                  │  │
-│   │   • ADX datasource plugin          • Azure Monitor datasource               │  │
-│   │   • KQL queries                    • PromQL queries                          │  │
-│   │   • User-created dashboards        • 12+ OOTB community dashboards          │  │
-│   │   • Quick-start dashboard imports  • Auto-provisioned in "Managed           │  │
-│   │                                      Prometheus" folder                      │  │
-│   └──────────────────────────────────────────────────────────────────────────────┘  │
-│                                                                                      │
-│   ┌──────────────────────────────────────────────────────────────────────────────┐  │
-│   │                      Managed Identities                                      │  │
-│   │                                                                              │  │
-│   │   adx-mon path:                    Managed Prometheus path:                  │  │
-│   │   • User-assigned identity         • System-assigned (AMA agent)             │  │
-│   │   • Federated credentials          • No additional identity setup            │  │
-│   │     (OIDC workload identity)                                                 │  │
-│   │   • ADX Admin role                                                           │  │
-│   └──────────────────────────────────────────────────────────────────────────────┘  │
-└──────────────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph Azure["Azure Subscription"]
+        subgraph AKS["AKS Cluster(s)"]
+            subgraph ADXStack["adx-mon Stack"]
+                CollectorDS["Collector (DaemonSet)<br/>• cAdvisor scrape<br/>• kubelet scrape<br/>• node logs<br/>• pod annotation discovery"]
+                CollectorSingleton["Collector (Singleton)<br/>• kube-apiserver"]
+                KSM["kube-state-metrics<br/>(2 shards)"]
+                Ingestor["Ingestor (StatefulSet)<br/>• batches & writes"]
+                
+                CollectorDS --> CollectorSingleton
+                CollectorSingleton --> KSM
+                KSM --> Ingestor
+            end
+            
+            subgraph PromStack["Managed Prometheus Stack"]
+                AMAMetricsDS["ama-metrics (DaemonSet)<br/>• cAdvisor scrape<br/>• kubelet scrape<br/>• node-exporter scrape<br/>• kube-state-metrics"]
+                AMAMetricsSingleton["ama-metrics (Singleton)<br/>• kube-apiserver scrape"]
+                
+                AMAMetricsDS --> AMAMetricsSingleton
+            end
+        end
+        
+        subgraph ADX["Azure Data Explorer (ADX)"]
+            MetricsDB["Metrics DB<br/>• ~600+ auto tables<br/>• 365d retention<br/>• 31d hot cache<br/>• KQL queryable"]
+            LogsDB["Logs DB<br/>• Kubelet logs<br/>• App container logs<br/>• Component logs"]
+            KQLFuncs["KQL Functions:<br/>• prom_delta()<br/>• Custom user functions<br/>• AlertRule CRDs (KQL)"]
+        end
+        
+        subgraph AMW["Azure Monitor Workspace (AMW)"]
+            PromStore["Prometheus Metrics Store<br/>• PromQL queryable<br/>• 18-month retention<br/>• Recording rules<br/>• Alert rules (PromQL)"]
+            DCR["DCR (Data Collection Rule)<br/>• Defines what to scrape<br/>• Filtering / relabeling"]
+            DCRA["DCRA (DCR Association)<br/>• Links DCR → AKS cluster"]
+            DCE["DCE (Data Collection Endpoint)<br/>• Ingestion endpoint URL"]
+        end
+        
+        subgraph Grafana["Managed Grafana"]
+            ADXPath["adx-mon path:<br/>• ADX datasource plugin<br/>• KQL queries<br/>• User-created dashboards<br/>• Quick-start dashboard imports"]
+            PromPath["Managed Prometheus path:<br/>• Azure Monitor datasource<br/>• PromQL queries<br/>• 12+ OOTB community dashboards<br/>• Auto-provisioned in 'Managed Prometheus' folder"]
+        end
+        
+        subgraph Identity["Managed Identities"]
+            ADXIdentity["adx-mon path:<br/>• User-assigned identity<br/>• Federated credentials (OIDC workload identity)<br/>• ADX Admin role"]
+            PromIdentity["Managed Prometheus path:<br/>• System-assigned (AMA agent)<br/>• No additional identity setup"]
+        end
+        
+        Ingestor --> ADX
+        AMAMetricsSingleton --> AMW
+        ADX --> Grafana
+        AMW --> Grafana
+    end
+    
+    style Azure fill:#e1f5ff
+    style AKS fill:#fff4e6
+    style ADXStack fill:#e8f5e9
+    style PromStack fill:#fce4ec
+    style ADX fill:#e3f2fd
+    style AMW fill:#f3e5f5
+    style Grafana fill:#fff9c4
+    style Identity fill:#f1f8e9
 ```
 
 ---
