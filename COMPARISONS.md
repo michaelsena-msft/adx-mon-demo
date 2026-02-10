@@ -40,58 +40,27 @@ Below is a simplified architecture diagram showing both approaches and the compo
 graph TB
     subgraph Azure["Azure Subscription"]
         subgraph AKS["AKS Cluster(s)"]
-            subgraph ADXStack["adx-mon Stack"]
-                CollectorDS["Collector (DaemonSet)<br/>• cAdvisor scrape<br/>• kubelet scrape<br/>• node logs<br/>• pod annotation discovery"]
-                CollectorSingleton["Collector (Singleton)<br/>• kube-apiserver"]
-                KSM["kube-state-metrics<br/>(2 shards)"]
-                Ingestor["Ingestor (StatefulSet)<br/>• batches & writes"]
-                
-                CollectorDS --> CollectorSingleton
-                CollectorSingleton --> KSM
-                KSM --> Ingestor
-            end
-            
-            subgraph PromStack["Managed Prometheus Stack"]
-                AMAMetricsDS["ama-metrics (DaemonSet)<br/>• cAdvisor scrape<br/>• kubelet scrape<br/>• node-exporter scrape<br/>• kube-state-metrics"]
-                AMAMetricsSingleton["ama-metrics (Singleton)<br/>• kube-apiserver scrape"]
-                
-                AMAMetricsDS --> AMAMetricsSingleton
-            end
+            ADXMon["adx-mon Stack<br/>• Collectors (DaemonSet + Singleton)<br/>• kube-state-metrics<br/>• Ingestor"]
+            ManagedProm["Managed Prometheus<br/>• ama-metrics agents<br/>• Auto-configured"]
         end
         
-        subgraph ADX["Azure Data Explorer (ADX)"]
-            MetricsDB["Metrics DB<br/>• ~600+ auto tables<br/>• 365d retention<br/>• 31d hot cache<br/>• KQL queryable"]
-            LogsDB["Logs DB<br/>• Kubelet logs<br/>• App container logs<br/>• Component logs"]
-            KQLFuncs["KQL Functions:<br/>• prom_delta()<br/>• Custom user functions<br/>• AlertRule CRDs (KQL)"]
-        end
+        ADX["Azure Data Explorer<br/>• Metrics DB (KQL)<br/>• Logs DB<br/>• 365d retention"]
+        AMW["Azure Monitor Workspace<br/>• Prometheus Store (PromQL)<br/>• 18-month retention"]
         
-        subgraph AMW["Azure Monitor Workspace (AMW)"]
-            PromStore["Prometheus Metrics Store<br/>• PromQL queryable<br/>• 18-month retention<br/>• Recording rules<br/>• Alert rules (PromQL)"]
-            DCR["DCR (Data Collection Rule)<br/>• Defines what to scrape<br/>• Filtering / relabeling"]
-            DCRA["DCRA (DCR Association)<br/>• Links DCR → AKS cluster"]
-            DCE["DCE (Data Collection Endpoint)<br/>• Ingestion endpoint URL"]
-        end
+        Grafana["Managed Grafana<br/>• ADX datasource (adx-mon)<br/>• Azure Monitor datasource (Managed Prom)<br/>• Dashboards for both paths"]
         
-        subgraph Grafana["Managed Grafana"]
-            ADXPath["adx-mon path:<br/>• ADX datasource plugin<br/>• KQL queries<br/>• User-created dashboards<br/>• Quick-start dashboard imports"]
-            PromPath["Managed Prometheus path:<br/>• Azure Monitor datasource<br/>• PromQL queries<br/>• 12+ OOTB community dashboards<br/>• Auto-provisioned in 'Managed Prometheus' folder"]
-        end
+        Identity["Managed Identities<br/>• User-assigned + OIDC (adx-mon)<br/>• System-assigned (Managed Prom)"]
         
-        subgraph Identity["Managed Identities"]
-            ADXIdentity["adx-mon path:<br/>• User-assigned identity<br/>• Federated credentials (OIDC workload identity)<br/>• ADX Admin role"]
-            PromIdentity["Managed Prometheus path:<br/>• System-assigned (AMA agent)<br/>• No additional identity setup"]
-        end
-        
-        Ingestor --> ADX
-        AMAMetricsSingleton --> AMW
+        ADXMon --> ADX
+        ManagedProm --> AMW
         ADX --> Grafana
         AMW --> Grafana
     end
     
     style Azure fill:#e1f5ff
     style AKS fill:#fff4e6
-    style ADXStack fill:#e8f5e9
-    style PromStack fill:#fce4ec
+    style ADXMon fill:#e8f5e9
+    style ManagedProm fill:#fce4ec
     style ADX fill:#e3f2fd
     style AMW fill:#f3e5f5
     style Grafana fill:#fff9c4
