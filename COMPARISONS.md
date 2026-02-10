@@ -988,5 +988,5 @@ This hybrid approach gives you:
 | Use Kubernetes events for troubleshooting | https://learn.microsoft.com/en-us/azure/aks/events |
 | <span id="ref-aks-diagnostics"></span>AKS Control Plane diagnostics and logs | https://learn.microsoft.com/en-us/azure/azure-monitor/reference/tables/akscontrolplane |
 | Monitor AKS apiserver requests | https://learn.microsoft.com/en-us/azure/aks/monitor-apiserver |
-| <span id="ref-grafana-dashboards"></span>Azure Managed Grafana dashboards with Prometheus | https://azure.github.io/adx-mon/quick-start/ |
+| <span id="ref-grafana-dashboards"></span>Azure Managed Grafana dashboards with Prometheus | https://learn.microsoft.com/en-us/azure/azure-monitor/visualize/visualize-use-grafana-dashboards |
 | <span id="ref-adx-mon-crds"></span>adx-mon GitHub repository | https://github.com/Azure/adx-mon |
