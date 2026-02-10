@@ -326,8 +326,8 @@ When you link an Azure Monitor Workspace to a Managed Grafana instance, these da
 | **Node Load** | ❌ Not collected by default | ✅ `node_load1`, `node_load5`, `node_load15` | ✅ Full set |
 | **Kubelet Health** | ✅ Via kubelet metrics endpoint | ✅ Volume stats, runtime ops, pod start latency | ✅ Full kubelet |
 | **kube-state-metrics** | ✅ Pod/deployment/node state via KSM 2-shard | ✅ Same KSM metrics | ✅ Same KSM metrics |
-| **kube-apiserver** | ✅ Via Collector Singleton | ⚠️ Requires control plane metrics (preview) | ⚠️ Preview feature |
-| **etcd** | ❌ Not directly scraped | ⚠️ Requires control plane metrics (preview) | ⚠️ Preview feature |
+| **kube-apiserver** | ✅ Via Collector Singleton | ⚠️ Requires control plane metrics (preview) [[ref]](#ref-control-plane-metrics) | ⚠️ Preview feature |
+| **etcd** | ❌ Not directly scraped | ⚠️ Requires control plane metrics (preview) [[ref]](#ref-control-plane-metrics) | ⚠️ Preview feature |
 | **kube-scheduler** | ❌ Not scraped | ❌ OFF by default (even with control plane) | ✅ Can be enabled |
 | **kube-controller-manager** | ❌ Not scraped | ❌ OFF by default (even with control plane) | ✅ Can be enabled |
 | **CoreDNS** | ❌ Not scraped | ❌ OFF by default | ✅ Can be enabled |
@@ -966,7 +966,7 @@ This hybrid approach gives you:
 | Recommended alert rules Bicep template | https://github.com/Azure/prometheus-collector/blob/main/AddonBicepTemplate/recommendedMetricAlerts.bicep |
 | Customize Prometheus metrics scraping (ConfigMap) | https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-configuration |
 | Minimal ingestion profile details | https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-configuration-minimal |
-| Monitor AKS control plane metrics (preview) | https://learn.microsoft.com/en-us/azure/aks/control-plane-metrics-monitor |
+| <span id="ref-control-plane-metrics"></span>Monitor AKS control plane metrics (preview) | https://learn.microsoft.com/en-us/azure/aks/control-plane-metrics-monitor |
 | Data Collection Rules and related resources | https://learn.microsoft.com/en-us/azure/azure-monitor/containers/kubernetes-data-collection-configure#dcrs-and-related-resources |
 | Data Collection Endpoints overview | https://learn.microsoft.com/en-us/azure/azure-monitor/data-collection/data-collection-endpoint-overview |
 | Prometheus alerts in Azure Monitor | https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/prometheus-alerts |
