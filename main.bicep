@@ -39,6 +39,9 @@ param userTenantId string = tenant().tenantId
 @description('Force update tag for deployment scripts and Kusto scripts.')
 param deployTimestamp string = utcNow()
 
+@description('Enable Managed Prometheus for AKS metrics collection.')
+param enableManagedPrometheus bool = false
+
 // ---------- Resource Group ----------
 
 resource rg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
@@ -94,6 +97,19 @@ module grafana 'modules/grafana.bicep' = {
     grafanaName: grafanaName
     location: location
     adminPrincipalIds: userPrincipalIds
+  }
+}
+
+// ---------- Managed Prometheus (optional, needs AKS and Grafana) ----------
+
+module managedPrometheus 'modules/managed-prometheus.bicep' = if (enableManagedPrometheus) {
+  scope: rg
+  name: 'managed-prometheus-deployment'
+  params: {
+    location: location
+    aksClusterName: aks.outputs.aksName
+    grafanaPrincipalId: grafana.outputs.grafanaPrincipalId
+    grafanaName: grafana.outputs.grafanaName
   }
 }
 
@@ -157,3 +173,4 @@ output adxClusterUri string = adx.outputs.adxUri
 output adxWebExplorerUrl string = 'https://dataexplorer.azure.com/clusters/${replace(adx.outputs.adxUri, 'https://', '')}/databases/Metrics'
 output grafanaEndpoint string = grafana.outputs.grafanaEndpoint
 output resourceGroupName string = rg.name
+output azureMonitorWorkspaceId string = enableManagedPrometheus ? managedPrometheus.outputs.azureMonitorWorkspaceId : ''
