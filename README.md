@@ -1,6 +1,9 @@
 # adx-mon Bicep Demo
 
-A single-command Bicep deployment of [adx-mon](https://github.com/Azure/adx-mon) on AKS — metrics and logs flow directly into [Azure Data Explorer](https://learn.microsoft.com/en-us/azure/data-explorer/) and are visualized through [Managed Grafana](https://learn.microsoft.com/en-us/azure/managed-grafana/).
+A single-command Bicep deployment of [adx-mon](https://github.com/Azure/adx-mon) on AKS.
+adx-mon scrapes Prometheus-format metrics and container logs, stores them in
+[Azure Data Explorer (ADX)](https://learn.microsoft.com/en-us/azure/data-explorer/), and
+visualizes everything through [Managed Grafana](https://learn.microsoft.com/en-us/azure/managed-grafana/).
 
 ## Architecture
 
@@ -13,10 +16,10 @@ flowchart LR
         ING["Ingestor\nStatefulSet"]
     end
 
-    CD -- scrapes --> cAdvisor["cAdvisor\nkubelet"]
+    CD -- scrapes --> cAdvisor["cAdvisor /\nkubelet"]
     CD -- scrapes --> Pods["Annotated\nPods"]
     CS -- scrapes --> API["kube-apiserver"]
-    KSM -. scraped by Collector .-> CD
+    KSM -. scraped by .-> CD
 
     CD --> ING
     CS --> ING
@@ -27,38 +30,44 @@ flowchart LR
     MetricsDB --> Grafana["Managed\nGrafana"]
     LogsDB --> Grafana
 
+    %% Optional: Managed Prometheus path
+    AKS -. "scrape (ama-metrics)" .-> AMW["Azure Monitor\nWorkspace"]
+    AMW -. linked .-> Grafana
+
+    %% Optional: Geneva path
+    AKS -. "StatsD / Fluentd" .-> Geneva["Geneva\n(MDM + Warm Path)"]
+
     style AKS fill:#e8f4fd,stroke:#0078d4
     style MetricsDB fill:#fff3cd,stroke:#d4a017
     style LogsDB fill:#fff3cd,stroke:#d4a017
     style Grafana fill:#d4edda,stroke:#28a745
+    style AMW fill:#f0e6ff,stroke:#7b2ff7,stroke-dasharray: 5 5
+    style Geneva fill:#fce4ec,stroke:#c62828,stroke-dasharray: 5 5
 ```
 
-[adx-mon](https://github.com/Azure/adx-mon) scrapes Prometheus-compatible endpoints and writes to ADX. Each Prometheus metric name becomes its own table in the **Metrics** database. Logs are written to four tables (`Collector`, `Ingestor`, `Kubelet`, `AdxmonIngestorTableDetails`) in the **Logs** database.
+**Solid lines** = core adx-mon pipeline (always deployed).
+**Dashed lines** = optional paths — [Managed Prometheus](#optional-managed-prometheus) and [Geneva](#geneva-integration-1p-teams).
+
+Each Prometheus metric becomes its own table in the **Metrics** database (~600+ tables).
+Logs land in four tables (`Collector`, `Ingestor`, `Kubelet`, `AdxmonIngestorTableDetails`)
+in the **Logs** database.
 
 ## What Gets Deployed
 
 | Resource | Purpose |
 |----------|---------|
-| **AKS Cluster** | Hosts adx-mon collectors, ingestors, and [kube-state-metrics](https://github.com/kubernetes/kube-state-metrics) |
+| **AKS Cluster** | Hosts adx-mon collectors, ingestor, and [kube-state-metrics](https://github.com/kubernetes/kube-state-metrics) |
 | **Azure Data Explorer** | Stores metrics (~600+ auto-created tables) and logs (4 tables) |
-| **Managed Grafana** | Visualization with ADX datasource auto-configured |
-| **Managed Identities** | [Workload identity](https://learn.microsoft.com/en-us/azure/aks/workload-identity-overview) federation — no secrets |
-
-### Key Components
-
-| Component | What It Does |
-|-----------|-------------|
-| **Collector DaemonSet** (per node) | Scrapes [cAdvisor](https://github.com/google/cadvisor), kubelet metrics, and annotated pods |
-| **Collector Singleton** (1 replica) | Scrapes `kube-apiserver` for API request rates, latencies, etcd stats |
-| **Ingestor StatefulSet** | Receives metrics from all collectors, batches, and writes to ADX |
-| **kube-state-metrics** (sharded) | Exposes Kubernetes object state (pod phase, deployment replicas, node conditions) |
+| **Managed Grafana** | Visualization — ADX datasource is auto-configured |
+| **Managed Identities** | [Workload identity](https://learn.microsoft.com/en-us/azure/aks/workload-identity-overview) federation — no secrets stored |
+| **Managed Prometheus** *(optional)* | AMW + data-collection pipeline; set `enableManagedPrometheus = true` |
 
 ## Quick Start
 
 ### Prerequisites
 
-- Azure CLI with Bicep (`az bicep install`)
-- An Azure subscription with Contributor access
+- [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) with Bicep (`az bicep install`)
+- An Azure subscription with **Contributor** access
 
 ### 1. Configure Parameters
 
@@ -66,14 +75,16 @@ flowchart LR
 cp main.sample.bicepparam main.bicepparam
 ```
 
-Edit `main.bicepparam` with your values. To grant yourself ADX Viewer + Grafana Admin access, add your Azure AD object ID:
+Edit `main.bicepparam` — at minimum you'll want to grant yourself
+**ADX Viewer + Grafana Admin** access by adding your principal ID.
+
+#### Finding Your Principal ID
 
 ```bash
-# Find your principal ID
 az ad signed-in-user show --query id -o tsv
 ```
 
-Add it to the parameter file:
+Add the returned object ID to the parameter file:
 
 ```bicep
 param userPrincipalIds = [
@@ -81,7 +92,46 @@ param userPrincipalIds = [
 ]
 ```
 
-> **Tip:** For multiple users, keep principal IDs in a file (e.g., `~/ids.txt`) and reference them. If users are in a different tenant (e.g., TME), set `userTenantId` to that tenant's ID.
+#### Granting Access to Multiple Users (`~/ids.txt`)
+
+For teams, store Azure AD **principal (object) IDs** in a file — one per line:
+
+```text
+# ~/ids.txt — principal object IDs only (NOT tenant IDs)
+aaaa1111-bb22-cc33-dd44-eeeeee000001   # teammate
+aaaa1111-bb22-cc33-dd44-eeeeee000002   # you
+```
+
+> ⚠️ **Only principal object IDs go in this file.** A tenant ID
+> (e.g., `aaaa1111-86f1-41af-91ab-2d7cd011db47`) is *not* a principal
+> and must not be listed here.
+
+Then reference it in the parameter file:
+
+```bicep
+param userPrincipalIds = [
+  'aaaa1111-bb22-cc33-dd44-eeeeee000001'
+  'aaaa1111-bb22-cc33-dd44-eeeeee000002'
+]
+```
+
+Each listed principal gets **ADX AllDatabasesViewer** and **Grafana Admin**.
+
+#### Cross-Tenant Users (e.g., TME Tenant)
+
+If your users belong to a different Azure AD tenant (common for TME,
+tenant `bbbb2222-8e4d-4615-bad6-149c02e7720d`), set `userTenantId`
+so ADX creates the role assignments in the correct tenant:
+
+```bicep
+param userPrincipalIds = [
+  'aaaa1111-bb22-cc33-dd44-eeeeee000002'
+]
+param userTenantId = 'bbbb2222-8e4d-4615-bad6-149c02e7720d'
+```
+
+When `userTenantId` is omitted it defaults to the deploying subscription's
+tenant — which is correct when all users are in the same tenant.
 
 ### 2. Deploy
 
@@ -93,25 +143,27 @@ az deployment sub create \
   --name adxmon-deploy
 ```
 
-Deployment takes ~20 minutes (ADX cluster provisioning is the bottleneck).
+Deployment takes **~20 minutes** (ADX cluster provisioning is the bottleneck).
 
 ### 3. Verify
 
 ```bash
-# Get deployment outputs
 az deployment sub show --name adxmon-deploy --query 'properties.outputs' -o json
 ```
 
 This returns:
-- **ADX Web Explorer URL** — query metrics/logs in the browser
-- **Grafana Endpoint** — build dashboards (you have Grafana Admin)
-- **ADX Cluster URI** — for programmatic access
+
+| Output | Use |
+|--------|-----|
+| `adxWebExplorerUrl` | Query metrics / logs in the browser |
+| `grafanaEndpoint` | Build dashboards (you have Grafana Admin) |
+| `adxClusterUri` | Programmatic access to ADX |
 
 ## Collecting Your Application Data
 
 ### Metrics (Pod Annotations)
 
-Add annotations to your pod spec to have adx-mon scrape Prometheus metrics:
+Annotate your pod spec so the adx-mon Collector scrapes Prometheus metrics:
 
 ```yaml
 annotations:
@@ -120,7 +172,7 @@ annotations:
   adx-mon/path: "/metrics"
 ```
 
-Alternatively, push metrics via [Prometheus remote write](https://prometheus.io/docs/concepts/remote_write_spec/) to the Collector at `:3100/receive`.
+You can also push metrics via [Prometheus remote write](https://prometheus.io/docs/concepts/remote_write_spec/) to the Collector at `:3100/receive`.
 
 ### Logs (Pod Annotations)
 
@@ -134,26 +186,43 @@ annotations:
 
 ## Optional: Managed Prometheus
 
-[Managed Prometheus](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/prometheus-metrics-overview) can be enabled alongside adx-mon:
+[Managed Prometheus](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/prometheus-metrics-overview)
+can run **alongside** adx-mon — the two systems are independent and do not conflict.
 
 ```bicep
 param enableManagedPrometheus = true
 ```
 
-This deploys an Azure Monitor Workspace (AMW), data collection endpoint/rule, and links the workspace to Grafana — providing out-of-the-box dashboards and alert rules. See [`modules/managed-prometheus.bicep`](modules/managed-prometheus.bicep) for details.
+When enabled, Bicep deploys an [Azure Monitor Workspace (AMW)](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/azure-monitor-workspace-overview),
+data-collection endpoint/rule, and links the AMW to Grafana.
+This gives you Azure's built-in dashboards and alert rules in addition to the adx-mon pipeline.
+See [`modules/managed-prometheus.bicep`](modules/managed-prometheus.bicep) for implementation details
+and [COMPARISONS.md](COMPARISONS.md) for a detailed coverage comparison.
 
 ## Geneva Integration (1P Teams)
 
-[Geneva](https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/containers-bburns/azure-kubernetes-service/aks-for-first-party-customers/monitoring/index) is Microsoft's internal monitoring platform and can coexist with adx-mon on the same cluster. Metrics flow via Prom2MDM or StatsD to MDM; logs flow via the Geneva MA DaemonSet. Each system runs its own DaemonSet — no conflicts.
+[Geneva](https://eng.ms/docs/products/geneva/getting_started/environments/akslinux) is Microsoft's
+internal monitoring platform. It coexists with adx-mon on the same AKS cluster — each system runs
+independent DaemonSets with no conflicts.
+
+| Signal  | Geneva Path | How It Works |
+|---------|-------------|--------------|
+| Metrics | StatsD → [MetricsExtension](https://eng.ms/docs/products/geneva/collect/instrument/statsddaemon) → MDM | Apps emit StatsD on UDP 8125; MetricsExtension DaemonSet aggregates and publishes to Geneva MDM |
+| Metrics | Prometheus → [Managed Prometheus](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/prometheus-metrics-overview) → MDM | AKS Managed Prometheus scrapes pods and remote-writes to an AMW backed by Geneva MDM |
+| Logs    | stdout → Fluentd → [MDSD](https://eng.ms/docs/products/geneva/collect/references/agent/linuxmultitenant) → Geneva | Fluentd DaemonSet tails container logs and forwards to MDSD DaemonSet → Geneva warm path |
+
+**Setup**: Geneva agent deployment uses Kubernetes manifests (Helm/YAML), not Bicep.
+See the [Geneva on AKS guide](https://eng.ms/docs/products/geneva/getting_started/environments/akslinux)
+and the [Geneva onboarding portal](https://portal.microsoftgeneva.com/account/onboard).
 
 ## Exploring the Data
 
 ### ADX Web Explorer
 
-Open the ADX Web Explorer URL from deployment outputs, then try:
+Open the `adxWebExplorerUrl` from deployment outputs, then try:
 
 ```kusto
-// See all metric tables
+// List all metric tables
 .show tables | sort by TableName
 
 // Sample a metric
@@ -161,7 +230,7 @@ ContainerCpuUsageSecondsTotal
 | where Timestamp > ago(5m)
 | take 10
 
-// Use the prom_delta function for counter metrics
+// Counter rate with prom_delta
 ContainerCpuUsageSecondsTotal
 | where Timestamp > ago(10m)
 | invoke prom_delta()
@@ -170,13 +239,14 @@ ContainerCpuUsageSecondsTotal
 
 ### Grafana
 
-Navigate to the Grafana endpoint, add panels using the pre-configured ADX datasource, and query the `Metrics` or `Logs` database.
+Navigate to the `grafanaEndpoint`, add panels using the pre-configured ADX datasource,
+and query the **Metrics** or **Logs** database.
 
 ## File Structure
 
 ```
 ├── main.bicep                    # Subscription-scope orchestrator
-├── main.sample.bicepparam        # Sample parameters (customize → main.bicepparam)
+├── main.sample.bicepparam        # Sample parameters (copy → main.bicepparam)
 ├── bicepconfig.json              # Bicep linter config
 ├── modules/
 │   ├── aks.bicep                 # AKS with OIDC + workload identity
@@ -185,7 +255,7 @@ Navigate to the Grafana endpoint, add panels using the pre-configured ADX dataso
 │   ├── grafana.bicep             # Managed Grafana + user admin roles
 │   ├── role-assignments.bicep    # ADX RBAC (adx-mon, Grafana, user viewers)
 │   ├── k8s-workloads.bicep       # Deployment script: applies K8s manifests
-│   ├── grafana-config.bicep      # Deployment script: ADX datasource only
+│   ├── grafana-config.bicep      # Deployment script: ADX datasource setup
 │   └── managed-prometheus.bicep  # Optional: AMW, DCE, DCR, DCRA
 └── k8s/
     ├── crds.yaml                 # adx-mon Custom Resource Definitions
@@ -203,16 +273,17 @@ Navigate to the Grafana endpoint, add panels using the pre-configured ADX dataso
 | `resourceGroupName` | `rg-adx-mon` | Resource group name |
 | `location` | `eastus2` | Azure region |
 | `aksClusterName` | `aks-adx-mon` | AKS cluster name |
+| `adxClusterName` | auto-generated | ADX cluster name (lowercase alphanumeric, ≤ 22 chars) |
 | `grafanaName` | `grafana-adx-mon` | Grafana workspace name |
 | `nodeVmSize` | `Standard_D4s_v3` | VM size for AKS system node pool |
 | `nodeCount` | `2` | Number of AKS nodes |
-| `adxSkuName` | `Standard_E2ads_v5` | ADX cluster SKU |
-| `adxSkuCapacity` | `2` | ADX cluster instance count |
-| `userPrincipalIds` | `[]` | Azure AD object IDs → ADX Viewer + Grafana Admin |
-| `userTenantId` | current tenant | Tenant for user principals (override for cross-tenant) |
+| `adxSkuName` | `Standard_E2ads_v5` | ADX compute SKU |
+| `adxSkuCapacity` | `2` | ADX instance count |
+| `userPrincipalIds` | `[]` | Azure AD **object IDs** → ADX Viewer + Grafana Admin |
+| `userTenantId` | deploying tenant | Tenant for the listed principals ([cross-tenant](#cross-tenant-users-eg-tme-tenant)) |
 | `enableManagedPrometheus` | `false` | Deploy Managed Prometheus alongside adx-mon |
 
 ## Further Reading
 
 - [adx-mon on GitHub](https://github.com/Azure/adx-mon) — source, configuration, and CRD reference
-- [COMPARISONS.md](COMPARISONS.md) — detailed comparison of adx-mon vs. Managed Prometheus coverage
+- [COMPARISONS.md](COMPARISONS.md) — adx-mon vs. Managed Prometheus vs. Container Insights coverage comparison
