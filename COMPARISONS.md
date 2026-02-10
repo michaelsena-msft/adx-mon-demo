@@ -34,22 +34,42 @@
 
 ## Metrics Architecture Overview
 
-Below is a simplified architecture diagram showing both approaches and the components involved.
+Below is a simplified architecture diagram showing both approaches and the components involved, including the distinction between infrastructure and application metrics.
 
 ```mermaid
 graph TB
     subgraph Azure["Azure Subscription"]
         subgraph AKS["AKS Cluster(s)"]
-            ADXMon["adx-mon Stack<br/>• Collectors (DaemonSet + Singleton)<br/>• kube-state-metrics<br/>• Ingestor"]
-            ManagedProm["Managed Prometheus<br/>• ama-metrics agents<br/>• Auto-configured"]
+            subgraph Workloads["Workloads"]
+                direction LR
+                AppPods["Application Pods<br/><i>example: web-app</i><br/>• /metrics endpoint<br/>• Pod annotations"]
+                SystemPods["System Workloads<br/><i>kube-system/*</i><br/>• coredns<br/>• kube-proxy"]
+            end
+            
+            subgraph InfraSources["Infrastructure Metrics Sources"]
+                direction LR
+                Kubelet["kubelet<br/>• Container metrics (cAdvisor)<br/>• Node metrics"]
+                KSM["kube-state-metrics<br/>• Pod/Deployment state<br/>• Node conditions"]
+                APIServer["kube-apiserver<br/>• API request metrics<br/>• etcd stats"]
+            end
+            
+            ADXMon["adx-mon Collectors<br/>• DaemonSet (infra)<br/>• Singleton (control plane)<br/>• Ingestor"]
+            ManagedProm["Managed Prometheus<br/>• ama-metrics (infra)<br/>• Auto-configured"]
+            
+            AppPods -.->|"App metrics<br/>(via annotation)"| ADXMon
+            SystemPods -.->|"App metrics<br/>(custom config)"| ManagedProm
+            Kubelet -->|Infrastructure| ADXMon
+            KSM -->|Infrastructure| ADXMon
+            APIServer -->|Infrastructure| ADXMon
+            Kubelet -->|Infrastructure| ManagedProm
+            KSM -->|Infrastructure| ManagedProm
+            APIServer -.->|"Infra (preview)"| ManagedProm
         end
         
         ADX["Azure Data Explorer<br/>• Metrics DB (KQL)<br/>• Logs DB<br/>• 365d retention"]
         AMW["Azure Monitor Workspace<br/>• Prometheus Store (PromQL)<br/>• 18-month retention"]
         
         Grafana["Managed Grafana<br/>• ADX datasource (adx-mon)<br/>• Azure Monitor datasource (Managed Prom)<br/>• Dashboards for both paths"]
-        
-        Identity["Managed Identities<br/>• User-assigned + OIDC (adx-mon)<br/>• System-assigned (Managed Prom)"]
         
         ADXMon --> ADX
         ManagedProm --> AMW
@@ -59,13 +79,48 @@ graph TB
     
     style Azure fill:#e1f5ff
     style AKS fill:#fff4e6
+    style Workloads fill:#ffe6f0
+    style InfraSources fill:#e6f3ff
+    style AppPods fill:#fff0f5
+    style SystemPods fill:#fff0f5
+    style Kubelet fill:#e3f2fd
+    style KSM fill:#e3f2fd
+    style APIServer fill:#e3f2fd
     style ADXMon fill:#e8f5e9
     style ManagedProm fill:#fce4ec
     style ADX fill:#e3f2fd
     style AMW fill:#f3e5f5
     style Grafana fill:#fff9c4
-    style Identity fill:#f1f8e9
 ```
+
+### Infrastructure vs. Application Metrics
+
+The diagram distinguishes between two types of metrics:
+
+#### Infrastructure Metrics (Solid Lines)
+These are **automatically collected** by both monitoring solutions and provide visibility into the Kubernetes platform itself:
+
+| Metric Source | What It Monitors | adx-mon Collection | Managed Prometheus Collection |
+|---------------|------------------|-------------------|-------------------------------|
+| **kubelet (cAdvisor)** | Container CPU, memory, network, filesystem usage | ✅ DaemonSet scrape | ✅ ama-metrics DaemonSet |
+| **kubelet (resource)** | Kubelet operations, volume stats, pod lifecycle | ✅ DaemonSet scrape | ✅ ama-metrics DaemonSet |
+| **kube-state-metrics** | Pod/Deployment/Node state, conditions, resource requests/limits | ✅ Deployed & scraped | ✅ Deployed & scraped |
+| **kube-apiserver** | API request rates, latencies, etcd stats | ✅ Singleton scrape | ⚠️ Preview feature (Control Plane Metrics) |
+
+**Key Difference:** Both solutions automatically collect infrastructure metrics. Managed Prometheus requires enabling "Control Plane Metrics" (preview) for API server metrics, while adx-mon includes this by default.
+
+#### Application Metrics (Dashed Lines)
+These are **custom metrics** exposed by application workloads and must be explicitly configured:
+
+| Example Workload | Namespace | Metric Endpoint | adx-mon Collection | Managed Prometheus Collection |
+|------------------|-----------|-----------------|-------------------|-------------------------------|
+| **web-app** (custom) | `default` | `/metrics` | ✅ Pod annotation: `adx-mon/scrape: "true"` | ⚠️ Requires custom scrape config in ConfigMap |
+| **coredns** | `kube-system` | `:9153/metrics` | ✅ Pod annotation (if added) | ⚠️ Must enable `coredns` target (disabled by default) |
+| **kube-proxy** | `kube-system` | `:10249/metrics` | ✅ Pod annotation (if added) | ⚠️ Must enable `kubeproxy` target (disabled by default) |
+
+**Key Difference:**
+- **adx-mon**: Application metrics are collected via simple pod annotations (`adx-mon/scrape: "true"`). Any pod with a `/metrics` endpoint can be auto-discovered.
+- **Managed Prometheus**: Application metrics require editing the `ama-metrics-settings-configmap` to add custom scrape configurations. System workloads like `coredns` and `kube-proxy` must be explicitly enabled.
 
 ---
 
