@@ -965,7 +965,7 @@ This hybrid approach gives you:
 |-------|-----|
 | Azure Monitor managed service for Prometheus overview | https://learn.microsoft.com/en-us/azure/azure-monitor/metrics/prometheus-metrics-overview |
 | Default Prometheus metrics configuration | https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-default |
-| <span id="ref-aks-recommended-alerts"></span>Recommended alert rules for Kubernetes clusters (30 rules) | https://learn.microsoft.com/en-us/azure/azure-monitor/containers/kubernetes-metric-alerts |
+| <span id="ref-aks-recommended-alerts"></span>Recommended alert rules for Kubernetes clusters | https://learn.microsoft.com/en-us/azure/azure-monitor/containers/kubernetes-metric-alerts |
 | Recommended alert rules Bicep template | https://github.com/Azure/prometheus-collector/blob/main/AddonBicepTemplate/recommendedMetricAlerts.bicep |
 | Customize Prometheus metrics scraping (ConfigMap) | https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-configuration |
 | Minimal ingestion profile details | https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-configuration-minimal |
@@ -978,7 +978,7 @@ This hybrid approach gives you:
 | AKS baseline architecture — Monitoring section | https://learn.microsoft.com/en-us/azure/architecture/reference-architectures/containers/aks/baseline-aks#monitor-and-collect-logs-and-metrics |
 | Cost-effective alerting strategies for AKS | https://learn.microsoft.com/en-us/azure/azure-monitor/containers/cost-effective-alerting |
 | Migrate from self-hosted Prometheus | https://learn.microsoft.com/en-us/azure/azure-monitor/metrics/prometheus-migrate |
-| <span id="ref-amw-retention"></span>Azure Monitor Workspace data retention (18 months) | https://learn.microsoft.com/en-us/azure/azure-monitor/metrics/prometheus-metrics-details |
+| <span id="ref-amw-retention"></span>Azure Monitor Workspace data retention | https://learn.microsoft.com/en-us/azure/azure-monitor/metrics/prometheus-metrics-details |
 | <span id="ref-node-exporter"></span>Prometheus Node Exporter metrics documentation | https://prometheus.io/docs/guides/node-exporter/ |
 | Node Exporter GitHub repository | https://github.com/prometheus/node_exporter |
 | <span id="ref-kql-anomaly-detection"></span>KQL anomaly detection and time series functions | https://learn.microsoft.com/en-us/kusto/query/anomaly-detection?view=microsoft-fabric |
