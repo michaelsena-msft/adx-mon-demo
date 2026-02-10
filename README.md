@@ -1,15 +1,57 @@
-# ADX-Mon Bicep Demo
+# adx-mon Bicep Demo
 
-A single-command, Bicep-first deployment of [adx-mon](https://github.com/Azure/adx-mon) on AKS with Azure Data Explorer and Managed Grafana.
+A single-command Bicep deployment of [adx-mon](https://github.com/Azure/adx-mon) on AKS — metrics and logs flow directly into [Azure Data Explorer](https://learn.microsoft.com/en-us/azure/data-explorer/) and are visualized through [Managed Grafana](https://learn.microsoft.com/en-us/azure/managed-grafana/).
+
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph AKS["AKS Cluster"]
+        CD["Collector\nDaemonSet\n(per node)"]
+        CS["Collector\nSingleton"]
+        KSM["kube-state-metrics"]
+        ING["Ingestor\nStatefulSet"]
+    end
+
+    CD -- scrapes --> cAdvisor["cAdvisor\nkubelet"]
+    CD -- scrapes --> Pods["Annotated\nPods"]
+    CS -- scrapes --> API["kube-apiserver"]
+    KSM -. scraped by Collector .-> CD
+
+    CD --> ING
+    CS --> ING
+
+    ING -- batch write --> MetricsDB[("ADX\nMetrics DB\n~600 tables")]
+    ING -- batch write --> LogsDB[("ADX\nLogs DB\n4 tables")]
+
+    MetricsDB --> Grafana["Managed\nGrafana"]
+    LogsDB --> Grafana
+
+    style AKS fill:#e8f4fd,stroke:#0078d4
+    style MetricsDB fill:#fff3cd,stroke:#d4a017
+    style LogsDB fill:#fff3cd,stroke:#d4a017
+    style Grafana fill:#d4edda,stroke:#28a745
+```
+
+[adx-mon](https://github.com/Azure/adx-mon) scrapes Prometheus-compatible endpoints and writes to ADX. Each Prometheus metric name becomes its own table in the **Metrics** database. Logs are written to four tables (`Collector`, `Ingestor`, `Kubelet`, `AdxmonIngestorTableDetails`) in the **Logs** database.
 
 ## What Gets Deployed
 
 | Resource | Purpose |
 |----------|---------|
-| **AKS Cluster** | Hosts adx-mon collectors, ingestors, and kube-state-metrics |
-| **Azure Data Explorer** | Stores metrics (608+ tables) and logs (4 tables) |
-| **Managed Grafana** | Visualization — ADX datasource auto-configured, no pre-built dashboards |
-| **Managed Identities** | Workload identity federation (no secrets) for adx-mon ↔ ADX |
+| **AKS Cluster** | Hosts adx-mon collectors, ingestors, and [kube-state-metrics](https://github.com/kubernetes/kube-state-metrics) |
+| **Azure Data Explorer** | Stores metrics (~600+ auto-created tables) and logs (4 tables) |
+| **Managed Grafana** | Visualization with ADX datasource auto-configured |
+| **Managed Identities** | [Workload identity](https://learn.microsoft.com/en-us/azure/aks/workload-identity-overview) federation — no secrets |
+
+### Key Components
+
+| Component | What It Does |
+|-----------|-------------|
+| **Collector DaemonSet** (per node) | Scrapes [cAdvisor](https://github.com/google/cadvisor), kubelet metrics, and annotated pods |
+| **Collector Singleton** (1 replica) | Scrapes `kube-apiserver` for API request rates, latencies, etcd stats |
+| **Ingestor StatefulSet** | Receives metrics from all collectors, batches, and writes to ADX |
+| **kube-state-metrics** (sharded) | Exposes Kubernetes object state (pod phase, deployment replicas, node conditions) |
 
 ## Quick Start
 
@@ -18,14 +60,32 @@ A single-command, Bicep-first deployment of [adx-mon](https://github.com/Azure/a
 - Azure CLI with Bicep (`az bicep install`)
 - An Azure subscription with Contributor access
 
-### Deploy
+### 1. Configure Parameters
 
 ```bash
-# Copy and customize the parameter file
 cp main.sample.bicepparam main.bicepparam
-# Edit main.bicepparam with your values (principalIds, etc.)
+```
 
-# Deploy (takes ~20 minutes, ADX cluster is the bottleneck)
+Edit `main.bicepparam` with your values. To grant yourself ADX Viewer + Grafana Admin access, add your Azure AD object ID:
+
+```bash
+# Find your principal ID
+az ad signed-in-user show --query id -o tsv
+```
+
+Add it to the parameter file:
+
+```bicep
+param userPrincipalIds = [
+  '<your-object-id>'
+]
+```
+
+> **Tip:** For multiple users, keep principal IDs in a file (e.g., `~/ids.txt`) and reference them. If users are in a different tenant (e.g., TME), set `userTenantId` to that tenant's ID.
+
+### 2. Deploy
+
+```bash
 az deployment sub create \
   --location eastus2 \
   --template-file main.bicep \
@@ -33,85 +93,58 @@ az deployment sub create \
   --name adxmon-deploy
 ```
 
-### Outputs
+Deployment takes ~20 minutes (ADX cluster provisioning is the bottleneck).
 
-After deployment, get your endpoints:
+### 3. Verify
 
 ```bash
+# Get deployment outputs
 az deployment sub show --name adxmon-deploy --query 'properties.outputs' -o json
 ```
 
 This returns:
-- **ADX Web Explorer URL** — Query metrics/logs directly in the browser
-- **Grafana Endpoint** — Access dashboards (you have Grafana Admin)
-- **ADX Cluster URI** — For programmatic access
+- **ADX Web Explorer URL** — query metrics/logs in the browser
+- **Grafana Endpoint** — build dashboards (you have Grafana Admin)
+- **ADX Cluster URI** — for programmatic access
 
-## Architecture
+## Collecting Your Application Data
 
-### Where Are My Metrics?
+### Metrics (Pod Annotations)
 
-**Managed Prometheus is NOT used.** All metrics collection is handled entirely by adx-mon, which scrapes the same Prometheus-compatible endpoints that Managed Prometheus would. No Azure Monitor workspace is deployed.
+Add annotations to your pod spec to have adx-mon scrape Prometheus metrics:
 
-#### How metrics flow
-
+```yaml
+annotations:
+  adx-mon/scrape: "true"
+  adx-mon/port: "8080"
+  adx-mon/path: "/metrics"
 ```
-Prometheus endpoints ──▶ adx-mon Collector ──▶ adx-mon Ingestor ──▶ Azure Data Explorer
-                         (scrape & forward)     (batch & write)       (Metrics database)
-```
 
-#### What gets scraped
+Alternatively, push metrics via [Prometheus remote write](https://prometheus.io/docs/concepts/remote_write_spec/) to the Collector at `:3100/receive`.
 
-| Component | Scrape Target | Metrics Collected |
-|-----------|--------------|-------------------|
-| **Collector DaemonSet** (per node) | `kubelet :10250/metrics/cadvisor` | Container CPU, memory, network, filesystem (cAdvisor) |
-| | `kubelet :10250/metrics/resource` | Node-level CPU and memory summaries |
-| | Pods with `adx-mon/scrape: "true"` annotation | Application metrics from any annotated pod |
-| | Prometheus remote write (`:3100/receive`) | Metrics pushed by any app using remote write |
-| **Collector Singleton** (1 replica) | `kubernetes.default.svc/metrics` | kube-apiserver request rates, latencies, etcd cache stats |
-| **kube-state-metrics** (sharded StatefulSet) | Scraped by Collector via annotation | Kubernetes object state — pod phase, deployment replicas, node conditions, job status, etc. |
+### Logs (Pod Annotations)
 
-The **Ingestor** (StatefulSet) receives all metrics from collectors, batches them, and writes to ADX. Each Prometheus metric name becomes its own table in the **Metrics** database (~600+ auto-created tables).
+Route container logs to a custom ADX table:
 
-#### Coverage compared to Managed Prometheus
-
-adx-mon covers the core metric surface that Managed Prometheus provides by default on AKS:
-
-| Metric Source | This Deployment | Managed Prometheus Default |
-|--------------|:-:|:-:|
-| cAdvisor (container metrics) | ✅ | ✅ |
-| Kubelet resource metrics | ✅ | ✅ |
-| kube-apiserver | ✅ | ✅ |
-| kube-state-metrics | ✅ | ✅ |
-| Pod/application metrics | ✅ (annotation) | ✅ (ServiceMonitor) |
-| node-exporter | ❌ not deployed | ✅ |
-| Kubelet operational metrics | ❌ not scraped | ✅ |
-| CoreDNS | ❌ not scraped | ✅ |
-
-The gaps are **configuration gaps, not capability gaps** — adx-mon can scrape any Prometheus-compatible endpoint. To close them:
-- **node-exporter**: Deploy with `adx-mon/scrape: "true"` annotation for detailed host metrics (per-disk I/O, per-NIC stats, CPU modes).
-- **Kubelet operational metrics**: Add `https://$(HOSTNAME):10250/metrics` as a static scrape target in `collector-config`.
-- **CoreDNS**: Add `adx-mon/scrape` annotation to CoreDNS pods, or add a static scrape target.
-
-### Where Are My Logs?
-
-| Log Type | Location | Table |
-|----------|----------|-------|
-| **Infrastructure** (kubelet journal) | ADX → `Logs` database | `Kubelet` |
-| **adx-mon components** (ingestor/collector) | ADX → `Logs` database | `Ingestor`, `Collector` |
-| **Application logs** | Collected from containers via adx-mon annotations | ADX → `Logs` database |
-
-To send logs from your own app, add annotations to your pod:
 ```yaml
 annotations:
   adx-mon/log-destination: "Logs:MyAppTable"
   adx-mon/log-parsers: json
 ```
 
-### Grafana
+## Optional: Managed Prometheus
 
-Managed Grafana is deployed with an ADX datasource pre-configured. No dashboards are pre-loaded — explore the data using Grafana's built-in query editor or create your own.
+[Managed Prometheus](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/prometheus-metrics-overview) can be enabled alongside adx-mon:
 
-User principals specified in `userPrincipalIds` get **Grafana Admin** and **ADX Viewer** access automatically.
+```bicep
+param enableManagedPrometheus = true
+```
+
+This deploys an Azure Monitor Workspace (AMW), data collection endpoint/rule, and links the workspace to Grafana — providing out-of-the-box dashboards and alert rules. See [`modules/managed-prometheus.bicep`](modules/managed-prometheus.bicep) for details.
+
+## Geneva Integration (1P Teams)
+
+[Geneva](https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/containers-bburns/azure-kubernetes-service/aks-for-first-party-customers/monitoring/index) is Microsoft's internal monitoring platform and can coexist with adx-mon on the same cluster. Metrics flow via Prom2MDM or StatsD to MDM; logs flow via the Geneva MA DaemonSet. Each system runs its own DaemonSet — no conflicts.
 
 ## Exploring the Data
 
@@ -142,24 +175,25 @@ Navigate to the Grafana endpoint, add panels using the pre-configured ADX dataso
 ## File Structure
 
 ```
-├── main.bicep                 # Subscription-scope orchestrator
-├── main.sample.bicepparam     # Sample parameters (customize → main.bicepparam)
-├── bicepconfig.json           # Bicep linter config
+├── main.bicep                    # Subscription-scope orchestrator
+├── main.sample.bicepparam        # Sample parameters (customize → main.bicepparam)
+├── bicepconfig.json              # Bicep linter config
 ├── modules/
-│   ├── aks.bicep              # AKS with OIDC + workload identity
-│   ├── adx.bicep              # ADX cluster + Metrics/Logs databases
-│   ├── identity.bicep         # Managed identities + federated credentials
-│   ├── grafana.bicep          # Managed Grafana + user admin roles
-│   ├── role-assignments.bicep # ADX RBAC (adx-mon, Grafana, user viewers)
-│   ├── k8s-workloads.bicep    # Deployment script: applies K8s manifests
-│   └── grafana-config.bicep   # Deployment script: ADX datasource only
+│   ├── aks.bicep                 # AKS with OIDC + workload identity
+│   ├── adx.bicep                 # ADX cluster + Metrics/Logs databases
+│   ├── identity.bicep            # Managed identities + federated credentials
+│   ├── grafana.bicep             # Managed Grafana + user admin roles
+│   ├── role-assignments.bicep    # ADX RBAC (adx-mon, Grafana, user viewers)
+│   ├── k8s-workloads.bicep       # Deployment script: applies K8s manifests
+│   ├── grafana-config.bicep      # Deployment script: ADX datasource only
+│   └── managed-prometheus.bicep  # Optional: AMW, DCE, DCR, DCRA
 └── k8s/
-    ├── crds.yaml              # adx-mon Custom Resource Definitions
-    ├── ingestor.yaml          # Ingestor StatefulSet
-    ├── collector.yaml         # Collector DaemonSet + Singleton
-    ├── ksm.yaml               # kube-state-metrics (auto-sharded)
-    ├── functions.yaml         # Sample Function + ManagementCommand CRs
-    └── sample-alertrule.yaml  # Sample AlertRule for pod restart detection
+    ├── crds.yaml                 # adx-mon Custom Resource Definitions
+    ├── ingestor.yaml             # Ingestor StatefulSet
+    ├── collector.yaml            # Collector DaemonSet + Singleton
+    ├── ksm.yaml                  # kube-state-metrics (auto-sharded)
+    ├── functions.yaml            # Sample Function + ManagementCommand CRs
+    └── sample-alertrule.yaml     # Sample AlertRule for pod restart detection
 ```
 
 ## Parameters
@@ -170,5 +204,15 @@ Navigate to the Grafana endpoint, add panels using the pre-configured ADX dataso
 | `location` | `eastus2` | Azure region |
 | `aksClusterName` | `aks-adx-mon` | AKS cluster name |
 | `grafanaName` | `grafana-adx-mon` | Grafana workspace name |
-| `userPrincipalIds` | `[]` | User object IDs for ADX Viewer + Grafana Admin |
-| `userTenantId` | current tenant | Tenant for user principals |
+| `nodeVmSize` | `Standard_D4s_v3` | VM size for AKS system node pool |
+| `nodeCount` | `2` | Number of AKS nodes |
+| `adxSkuName` | `Standard_E2ads_v5` | ADX cluster SKU |
+| `adxSkuCapacity` | `2` | ADX cluster instance count |
+| `userPrincipalIds` | `[]` | Azure AD object IDs → ADX Viewer + Grafana Admin |
+| `userTenantId` | current tenant | Tenant for user principals (override for cross-tenant) |
+| `enableManagedPrometheus` | `false` | Deploy Managed Prometheus alongside adx-mon |
+
+## Further Reading
+
+- [adx-mon on GitHub](https://github.com/Azure/adx-mon) — source, configuration, and CRD reference
+- [COMPARISONS.md](COMPARISONS.md) — detailed comparison of adx-mon vs. Managed Prometheus coverage
