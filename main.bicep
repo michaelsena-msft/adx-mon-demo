@@ -173,4 +173,4 @@ output adxClusterUri string = adx.outputs.adxUri
 output adxWebExplorerUrl string = 'https://dataexplorer.azure.com/clusters/${replace(adx.outputs.adxUri, 'https://', '')}/databases/Metrics'
 output grafanaEndpoint string = grafana.outputs.grafanaEndpoint
 output resourceGroupName string = rg.name
-output azureMonitorWorkspaceId string = enableManagedPrometheus ? managedPrometheus.outputs.azureMonitorWorkspaceId : ''
+output azureMonitorWorkspaceId string = enableManagedPrometheus ? managedPrometheus.outputs.azureMonitorWorkspaceId : '' // BCP318: safe — guarded by enableManagedPrometheus
