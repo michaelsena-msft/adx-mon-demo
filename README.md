@@ -50,14 +50,47 @@ This returns:
 
 ### Where Are My Metrics?
 
-**Managed Prometheus is NOT used.** All metrics collection is handled by adx-mon:
+**Managed Prometheus is NOT used.** All metrics collection is handled entirely by adx-mon, which scrapes the same Prometheus-compatible endpoints that Managed Prometheus would. No Azure Monitor workspace is deployed.
 
-- **adx-mon Collector** (DaemonSet) — scrapes Prometheus endpoints on every node (cadvisor, kubelet, node metrics)
-- **adx-mon Collector Singleton** (Deployment) — scrapes cluster-wide endpoints (kube-apiserver)
-- **kube-state-metrics** — enriches with Kubernetes metadata (pod/deployment/node state)
-- **adx-mon Ingestor** (StatefulSet) — batches and writes everything to ADX
+#### How metrics flow
 
-All metrics land in the **Metrics** database in ADX (~600+ auto-created tables, one per metric name).
+```
+Prometheus endpoints ──▶ adx-mon Collector ──▶ adx-mon Ingestor ──▶ Azure Data Explorer
+                         (scrape & forward)     (batch & write)       (Metrics database)
+```
+
+#### What gets scraped
+
+| Component | Scrape Target | Metrics Collected |
+|-----------|--------------|-------------------|
+| **Collector DaemonSet** (per node) | `kubelet :10250/metrics/cadvisor` | Container CPU, memory, network, filesystem (cAdvisor) |
+| | `kubelet :10250/metrics/resource` | Node-level CPU and memory summaries |
+| | Pods with `adx-mon/scrape: "true"` annotation | Application metrics from any annotated pod |
+| | Prometheus remote write (`:3100/receive`) | Metrics pushed by any app using remote write |
+| **Collector Singleton** (1 replica) | `kubernetes.default.svc/metrics` | kube-apiserver request rates, latencies, etcd cache stats |
+| **kube-state-metrics** (sharded StatefulSet) | Scraped by Collector via annotation | Kubernetes object state — pod phase, deployment replicas, node conditions, job status, etc. |
+
+The **Ingestor** (StatefulSet) receives all metrics from collectors, batches them, and writes to ADX. Each Prometheus metric name becomes its own table in the **Metrics** database (~600+ auto-created tables).
+
+#### Coverage compared to Managed Prometheus
+
+adx-mon covers the core metric surface that Managed Prometheus provides by default on AKS:
+
+| Metric Source | This Deployment | Managed Prometheus Default |
+|--------------|:-:|:-:|
+| cAdvisor (container metrics) | ✅ | ✅ |
+| Kubelet resource metrics | ✅ | ✅ |
+| kube-apiserver | ✅ | ✅ |
+| kube-state-metrics | ✅ | ✅ |
+| Pod/application metrics | ✅ (annotation) | ✅ (ServiceMonitor) |
+| node-exporter | ❌ not deployed | ✅ |
+| Kubelet operational metrics | ❌ not scraped | ✅ |
+| CoreDNS | ❌ not scraped | ✅ |
+
+The gaps are **configuration gaps, not capability gaps** — adx-mon can scrape any Prometheus-compatible endpoint. To close them:
+- **node-exporter**: Deploy with `adx-mon/scrape: "true"` annotation for detailed host metrics (per-disk I/O, per-NIC stats, CPU modes).
+- **Kubelet operational metrics**: Add `https://$(HOSTNAME):10250/metrics` as a static scrape target in `collector-config`.
+- **CoreDNS**: Add `adx-mon/scrape` annotation to CoreDNS pods, or add a static scrape target.
 
 ### Where Are My Logs?
 
