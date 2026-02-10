@@ -318,10 +318,10 @@ When you link an Azure Monitor Workspace to a Managed Grafana instance, these da
 | **Container Memory** | ✅ `container_memory_working_set_bytes`, `_rss` | ✅ Same metrics | ✅ Same + more |
 | **Container Network** | ✅ `container_network_*` (Tx/Rx bytes, packets, drops) | ✅ Same metrics | ✅ Same metrics |
 | **Container Filesystem** | ✅ `container_fs_reads_total`, `_writes_total`, `_bytes` | ✅ Same metrics | ✅ Same metrics |
-| **Node CPU** | ⚠️ Via kubelet resource metrics only | ✅ `node_cpu_seconds_total` via node-exporter | ✅ Full node-exporter |
-| **Node Memory** | ⚠️ Via kubelet resource metrics only | ✅ `node_memory_*` (MemAvailable, MemTotal, etc.) | ✅ Full set |
-| **Node Disk** | ❌ Not collected by default | ✅ `node_disk_*` (read/write bytes, IO time) | ✅ Full set |
-| **Node Network** | ❌ Not collected by default | ✅ `node_network_*` (Tx/Rx bytes, drops) | ✅ Full set |
+| **Node CPU** | ⚠️ Via kubelet resource metrics only | ✅ `node_cpu_seconds_total` via node-exporter [[ref]](#ref-node-exporter) | ✅ Full node-exporter |
+| **Node Memory** | ⚠️ Via kubelet resource metrics only | ✅ `node_memory_*` (MemAvailable, MemTotal, etc.) [[ref]](#ref-node-exporter) | ✅ Full set |
+| **Node Disk** | ❌ Not collected by default | ✅ `node_disk_*` (read/write bytes, IO time) [[ref]](#ref-node-exporter) | ✅ Full set |
+| **Node Network** | ❌ Not collected by default | ✅ `node_network_*` (Tx/Rx bytes, drops) [[ref]](#ref-node-exporter) | ✅ Full set |
 | **Node Filesystem** | ❌ Not collected by default | ✅ `node_filesystem_size_bytes`, `_avail_bytes` | ✅ Full set |
 | **Node Load** | ❌ Not collected by default | ✅ `node_load1`, `node_load5`, `node_load15` | ✅ Full set |
 | **Kubelet Health** | ✅ Via kubelet metrics endpoint | ✅ Volume stats, runtime ops, pod start latency | ✅ Full kubelet |
@@ -339,12 +339,12 @@ When you link an Azure Monitor Workspace to a Managed Grafana instance, these da
 
 | Capability | adx-mon | Managed Prometheus |
 |-----------|---------|-------------------|
-| **OOTB Alert Rules** | ❌ Only a sample alert (pod restarts) | ✅ 28+ recommended alert rules across cluster, node, and pod levels |
+| **OOTB Alert Rules** | ❌ Only a sample alert (pod restarts) | ✅ 30 recommended alert rules across cluster, node, and pod levels [[ref]](#ref-aks-recommended-alerts) |
 | **Alert Language** | KQL (Kusto Query Language) | PromQL (Prometheus Query Language) |
 | **Alert Definition** | K8s CRD (`AlertRule`) — lives in cluster | Azure resource (Prometheus Rule Group) — lives in Azure |
 | **Cross-Signal Alerts** | ✅ Can query metrics AND logs in the same alert | ❌ Metrics only (logs require separate Log Analytics alerts) |
 | **Auto-Mitigation** | ✅ Built-in (`autoMitigateAfter` field) | ⚠️ Must configure resolve conditions separately |
-| **Anomaly Detection** | ✅ KQL has built-in ML functions (`series_decompose_anomalies`, `basket`, etc.) | ❌ PromQL has no native ML/anomaly detection |
+| **Anomaly Detection** | ✅ KQL has built-in ML functions (`series_decompose_anomalies`, `basket`, etc.) [[ref]](#ref-kql-anomaly-detection) | ❌ PromQL has no native ML/anomaly detection |
 | **Action Groups** | ⚠️ Must build custom integration | ✅ Native Azure Action Groups (email, SMS, webhook, Logic Apps, etc.) |
 | **Alert Routing** | ⚠️ Custom implementation needed | ✅ Azure Monitor alert processing rules |
 | **Ease of Setup** | ⚠️ Requires writing KQL + deploying CRDs | ✅ Toggle on/off in Azure Portal or deploy via ARM/Bicep |
@@ -353,7 +353,7 @@ When you link an Azure Monitor Workspace to a Managed Grafana instance, these da
 
 | Capability | adx-mon | Managed Prometheus |
 |-----------|---------|-------------------|
-| **OOTB Dashboards** | ❌ None pre-built (ADX datasource configured, user creates their own) | ✅ 12+ community dashboards auto-provisioned |
+| **OOTB Dashboards** | ❌ None pre-built (ADX datasource configured, user creates their own) | ✅ 12+ community dashboards auto-provisioned [[ref]](#ref-grafana-dashboards) |
 | **Dashboard Language** | KQL in Grafana ADX plugin | PromQL in Grafana Prometheus datasource |
 | **Dashboard Ecosystem** | Smaller — ADX/KQL dashboards are less common in the community | Larger — vast Grafana community dashboard library for Prometheus |
 | **Custom Dashboards** | ✅ Full KQL power (joins, time-series analysis, ML functions) | ✅ PromQL (powerful but single-metric-type focused) |
@@ -382,7 +382,7 @@ When you link an Azure Monitor Workspace to a Managed Grafana instance, these da
 
 | Aspect | adx-mon (ADX) | Managed Prometheus (AMW) |
 |--------|--------------|--------------------------|
-| **Max Retention** | Configurable (our setup: 365 days; can be years) | 18 months max |
+| **Max Retention** | Configurable (our setup: 365 days; can be years) [[ref]](#ref-adx-retention) | 18 months max [[ref]](#ref-amw-retention) |
 | **Hot Cache** | Configurable (our setup: 31 days) | N/A (all data queryable) |
 | **Query Language** | KQL — SQL-like, supports joins, ML, time-series functions, regex | PromQL — purpose-built for metrics, no joins or ML |
 | **Query Power** | Can JOIN metrics with logs, run anomaly detection, build materialized views | Focused on metric aggregation and rate calculations |
@@ -392,7 +392,7 @@ When you link an Azure Monitor Workspace to a Managed Grafana instance, these da
 
 | Aspect | adx-mon | Managed Prometheus |
 |--------|---------|-------------------|
-| **In-Cluster Components** | Collector (DaemonSet + Singleton), Ingestor (StatefulSet), KSM (StatefulSet), 9 CRDs | ama-metrics pods (managed, auto-updated) |
+| **In-Cluster Components** | Collector (DaemonSet + Singleton), Ingestor (StatefulSet), KSM (StatefulSet), 9 CRDs [[ref]](#ref-adx-mon-crds) | ama-metrics pods (managed, auto-updated) |
 | **Azure Resources to Manage** | ADX cluster, Managed Identity, Grafana, role assignments | AMW, DCR, DCRA, DCE (auto-provisioned), Grafana |
 | **Identity Setup** | Manual — federated credentials, workload identity, RBAC | Automatic — ama-metrics uses system identity |
 | **Updates** | Manual — update container images, CRDs | Automatic — Azure manages agent updates |
@@ -854,9 +854,9 @@ Container Insights is an Azure Monitor feature that deploys the `ama-logs` Daemo
 | **Pod stdout/stderr (all pods)** | ⚠️ Opt-in via annotation only | ✅ All pods by default (filterable) |
 | **Pod stdout/stderr (specific pods)** | ✅ Targeted via annotation → dedicated table | ✅ Filterable by namespace/annotation |
 | **Kubelet journal** | ✅ Direct systemd journal read | ⚠️ Not collected by default via Container Insights |
-| **K8s events** (scheduling, OOM, probes) | ❌ Not collected | ✅ `KubeEvents` table |
-| **Control plane logs** (apiserver, controller-manager) | ❌ Cannot access (Azure resource logs) | ✅ Diagnostic Settings → `AKSControlPlane` |
-| **Audit logs** (kube-audit, guard) | ❌ Cannot access | ✅ Diagnostic Settings → `AKSAudit` / `AKSAuditAdmin` |
+| **K8s events** (scheduling, OOM, probes) | ❌ Not collected | ✅ `KubeEvents` table [[ref]](#ref-kubeevents) |
+| **Control plane logs** (apiserver, controller-manager) | ❌ Cannot access (Azure resource logs) | ✅ Diagnostic Settings → `AKSControlPlane` [[ref]](#ref-aks-diagnostics) |
+| **Audit logs** (kube-audit, guard) | ❌ Cannot access | ✅ Diagnostic Settings → `AKSAudit` / `AKSAuditAdmin` [[ref]](#ref-aks-diagnostics) |
 | **Activity log** (cluster operations) | ❌ Not applicable | ✅ Auto-collected (free) |
 | **Component self-logs** | ✅ Collector + Ingestor logs to ADX | N/A (ama-logs logs are internal) |
 
@@ -870,7 +870,7 @@ Container Insights is an Azure Monitor feature that deploys the `ama-logs` Daemo
 | **Default table per app** | ✅ Each annotated app → own table | ❌ All pods → single `ContainerLogV2` table |
 | **Ingestion cost model** | Fixed (ADX cluster SKU) | Per-GB ingested (Analytics), reduced (Basic), minimal (Auxiliary) |
 | **Query cost** | Fixed (ADX cluster SKU) | Included (Analytics), per-GB scanned (Basic/Auxiliary) |
-| **Retention** | Configurable per-table (days to years), hot/cold tiering | 30–90d interactive (Analytics), up to 12yr total |
+| **Retention** | Configurable per-table (days to years), hot/cold tiering [[ref]](#ref-adx-retention) | 30–90d interactive (Analytics), up to 12yr total [[ref]](#ref-log-analytics-retention) |
 
 ### Cost Optimization Strategies
 
@@ -962,7 +962,8 @@ This hybrid approach gives you:
 |-------|-----|
 | Azure Monitor managed service for Prometheus overview | https://learn.microsoft.com/en-us/azure/azure-monitor/metrics/prometheus-metrics-overview |
 | Default Prometheus metrics configuration | https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-default |
-| Recommended alert rules for Kubernetes clusters | https://learn.microsoft.com/en-us/azure/azure-monitor/containers/kubernetes-metric-alerts |
+| <span id="ref-aks-recommended-alerts"></span>Recommended alert rules for Kubernetes clusters (30 rules) | https://learn.microsoft.com/en-us/azure/azure-monitor/containers/kubernetes-metric-alerts |
+| Recommended alert rules Bicep template | https://github.com/Azure/prometheus-collector/blob/main/AddonBicepTemplate/recommendedMetricAlerts.bicep |
 | Customize Prometheus metrics scraping (ConfigMap) | https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-configuration |
 | Minimal ingestion profile details | https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-configuration-minimal |
 | Monitor AKS control plane metrics (preview) | https://learn.microsoft.com/en-us/azure/aks/control-plane-metrics-monitor |
@@ -974,4 +975,18 @@ This hybrid approach gives you:
 | AKS baseline architecture — Monitoring section | https://learn.microsoft.com/en-us/azure/architecture/reference-architectures/containers/aks/baseline-aks#monitor-and-collect-logs-and-metrics |
 | Cost-effective alerting strategies for AKS | https://learn.microsoft.com/en-us/azure/azure-monitor/containers/cost-effective-alerting |
 | Migrate from self-hosted Prometheus | https://learn.microsoft.com/en-us/azure/azure-monitor/metrics/prometheus-migrate |
-| adx-mon GitHub repository | https://github.com/Azure/adx-mon |
+| <span id="ref-amw-retention"></span>Azure Monitor Workspace data retention (18 months) | https://learn.microsoft.com/en-us/azure/azure-monitor/metrics/prometheus-metrics-details |
+| <span id="ref-node-exporter"></span>Prometheus Node Exporter metrics documentation | https://prometheus.io/docs/guides/node-exporter/ |
+| Node Exporter GitHub repository | https://github.com/prometheus/node_exporter |
+| <span id="ref-kql-anomaly-detection"></span>KQL anomaly detection and time series functions | https://learn.microsoft.com/en-us/kusto/query/anomaly-detection?view=microsoft-fabric |
+| KQL series_decompose_anomalies function | https://learn.microsoft.com/en-us/kusto/query/series-decompose-function?view=microsoft-fabric |
+| <span id="ref-adx-retention"></span>Azure Data Explorer retention policy | https://learn.microsoft.com/en-us/kusto/management/retention-policy?view=microsoft-fabric |
+| Azure Data Explorer caching policy (hot cache) | https://learn.microsoft.com/en-us/kusto/management/cache-policy?view=microsoft-fabric |
+| <span id="ref-log-analytics-retention"></span>Log Analytics retention tiers and policies | https://learn.microsoft.com/en-us/azure/azure-monitor/logs/data-retention-configure |
+| Log Analytics table plans (Analytics, Basic, Auxiliary) | https://learn.microsoft.com/en-us/azure/azure-monitor/logs/logs-table-plans |
+| <span id="ref-kubeevents"></span>Azure Monitor KubeEvents table | https://learn.microsoft.com/en-us/azure/azure-monitor/reference/tables/kubeevents |
+| Use Kubernetes events for troubleshooting | https://learn.microsoft.com/en-us/azure/aks/events |
+| <span id="ref-aks-diagnostics"></span>AKS Control Plane diagnostics and logs | https://learn.microsoft.com/en-us/azure/azure-monitor/reference/tables/akscontrolplane |
+| Monitor AKS apiserver requests | https://learn.microsoft.com/en-us/azure/aks/monitor-apiserver |
+| <span id="ref-grafana-dashboards"></span>Azure Managed Grafana dashboards with Prometheus | https://azure.github.io/adx-mon/quick-start/ |
+| <span id="ref-adx-mon-crds"></span>adx-mon GitHub repository | https://github.com/Azure/adx-mon |
