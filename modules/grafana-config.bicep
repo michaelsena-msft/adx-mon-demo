@@ -1,4 +1,4 @@
-// Configures Grafana with ADX datasource (no dashboard deployment)
+// Configures Grafana with ADX datasource and optional dashboards
 
 @description('Azure region for the deployment script resource.')
 param location string
@@ -20,6 +20,9 @@ param deployerPrincipalId string
 
 @description('Force re-run of the deployment script.')
 param forceUpdateTag string = utcNow()
+
+@description('Dashboard definitions to provision. Each entry has a title and a JSON model string.')
+param dashboardDefinitions array = []
 
 resource grafana 'Microsoft.Dashboard/grafana@2024-10-01' existing = {
   name: grafanaName
@@ -59,6 +62,7 @@ resource configScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
       { name: 'GRAFANA_RG', value: resourceGroup().name }
       { name: 'ADX_URL', value: adxUri }
       { name: 'ADX_NAME', value: adxClusterName }
+      { name: 'DASHBOARD_DEFINITIONS', value: string(dashboardDefinitions) }
     ]
     scriptContent: '''
       set -e
@@ -78,7 +82,27 @@ resource configScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
       else
         echo "ADX datasource already exists."
       fi
-      echo "Grafana datasource configuration complete."
+
+      # Provision dashboards if any are defined
+      if [ "$DASHBOARD_DEFINITIONS" != "[]" ]; then
+        echo "$DASHBOARD_DEFINITIONS" | python3 -c "
+import json, sys, subprocess
+defs = json.load(sys.stdin)
+for d in defs:
+    title = d['title']
+    model = json.dumps(d['definition'])
+    print(f'Creating dashboard: {title}')
+    subprocess.run([
+        'az', 'grafana', 'dashboard', 'create',
+        '-n', '$GRAFANA_NAME', '-g', '$GRAFANA_RG',
+        '--title', title,
+        '--definition', model
+    ], check=True)
+"
+        echo "Dashboard provisioning complete."
+      fi
+
+      echo "Grafana configuration complete."
     '''
   }
 }

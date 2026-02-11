@@ -49,8 +49,6 @@ Both adx-mon and Managed Prometheus scrape standard Kubernetes metric sources. W
 | **Node-level (disk, load, network)** | ❌ Not collected | ✅ [node-exporter](https://github.com/prometheus/node_exporter) | Biggest gap — adx-mon lacks `node_load*`, `node_disk_*`, `node_filesystem_*`. Mitigated by deploying node-exporter with `adx-mon/scrape: "true"` |
 | **Application metrics** | ✅ Pod annotations | ⚠️ [Custom ConfigMap](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-configuration) | adx-mon: annotate pods. MP: edit `ama-metrics-settings-configmap` |
 
-**Bottom line**: Container and pod metrics are equivalent. Managed Prometheus has richer node-level metrics out of the box. adx-mon has kube-apiserver metrics without preview features.
-
 ---
 
 ## Logs
@@ -72,8 +70,8 @@ adx-mon's key advantage: metrics and logs in the **same ADX cluster**, queryable
 
 | Capability | adx-mon | Managed Prometheus |
 |-----------|---------|-------------------|
-| **OOTB alerts** | ❌ Sample only (pod restarts) | ✅ [28+ recommended rules](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/kubernetes-metric-alerts) |
-| **OOTB dashboards** | ❌ Datasource only, no dashboards | ✅ [12+ Grafana dashboards](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-default#dashboards) auto-provisioned |
+| **OOTB alerts** | ❌ Sample only (pod restarts) | ✅ [Recommended Prometheus alert rules](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/kubernetes-metric-alerts) |
+| **OOTB dashboards** | ❌ Datasource only, no dashboards | ✅ [16 auto-provisioned Grafana dashboards](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-default#dashboards) |
 | **Alert language** | KQL ([AlertRule CRD](https://github.com/Azure/adx-mon)) | PromQL ([Prometheus Rule Groups](https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/prometheus-alerts)) |
 | **Cross-signal alerts** | ✅ Join metrics + logs in one query | ❌ Metrics only |
 | **Action Groups** | ⚠️ Custom integration needed | ✅ [Native Azure Action Groups](https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/action-groups) |
@@ -124,4 +122,3 @@ adx-mon's key advantage: metrics and logs in the **same ADX cluster**, queryable
 | ADX retention policy | https://learn.microsoft.com/en-us/kusto/management/retention-policy |
 | KQL anomaly detection | https://learn.microsoft.com/en-us/kusto/query/series-decompose-anomalies-function |
 | Prometheus custom scrape config | https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-configuration |
-| AKS monitoring best practices | https://learn.microsoft.com/en-us/azure/azure-monitor/containers/best-practices-containers |

@@ -92,9 +92,7 @@ param userPrincipalIds = [
 ]
 ```
 
-#### Granting Access to Multiple Users (`~/ids.txt`)
-
-For teams, store Azure AD **principal (object) IDs** in a file — one per line:
+For teams, store Azure AD **principal (object) IDs** in `~/ids.txt` — one per line:
 
 ```text
 # ~/ids.txt — principal object IDs only (NOT tenant IDs)
@@ -102,36 +100,13 @@ aaaa1111-bb22-cc33-dd44-eeeeee000001   # teammate
 aaaa1111-bb22-cc33-dd44-eeeeee000002   # you
 ```
 
-> ⚠️ **Only principal object IDs go in this file.** A tenant ID
-> (e.g., `aaaa1111-86f1-41af-91ab-2d7cd011db47`) is *not* a principal
-> and must not be listed here.
-
-Then reference it in the parameter file:
-
-```bicep
-param userPrincipalIds = [
-  'aaaa1111-bb22-cc33-dd44-eeeeee000001'
-  'aaaa1111-bb22-cc33-dd44-eeeeee000002'
-]
-```
+> ⚠️ **Only principal object IDs go here.** Tenant IDs (e.g., `aaaa1111-…`) are *not* principals.
 
 Each listed principal gets **ADX AllDatabasesViewer** and **Grafana Admin**.
 
-#### Cross-Tenant Users (e.g., TME Tenant)
-
-If your users belong to a different Azure AD tenant (common for TME,
-tenant `bbbb2222-8e4d-4615-bad6-149c02e7720d`), set `userTenantId`
-so ADX creates the role assignments in the correct tenant:
-
-```bicep
-param userPrincipalIds = [
-  'aaaa1111-bb22-cc33-dd44-eeeeee000002'
-]
-param userTenantId = 'bbbb2222-8e4d-4615-bad6-149c02e7720d'
-```
-
-When `userTenantId` is omitted it defaults to the deploying subscription's
-tenant — which is correct when all users are in the same tenant.
+> **Cross-tenant users** — If principals belong to a different Azure AD tenant, also set
+> `userTenantId` (e.g., `param userTenantId = 'bbbb2222-…'`). When omitted it defaults to
+> the deploying subscription's tenant.
 
 ### 2. Deploy
 
@@ -199,6 +174,24 @@ This gives you Azure's built-in dashboards and alert rules in addition to the ad
 See [`modules/managed-prometheus.bicep`](modules/managed-prometheus.bicep) for implementation details
 and [COMPARISONS.md](COMPARISONS.md) for a detailed coverage comparison.
 
+## Grafana Dashboards
+
+The deployment provisions the ADX datasource automatically. You can also provision custom dashboards
+by passing `dashboardDefinitions` — an array of `{ title, definition }` objects where `definition`
+is a [Grafana dashboard JSON model](https://grafana.com/docs/grafana/latest/dashboards/build-dashboards/view-dashboard-json-model/):
+
+```bicep
+param dashboardDefinitions = [
+  {
+    title: 'My Dashboard'
+    definition: { /* Grafana JSON model */ }
+  }
+]
+```
+
+The deployment script loops over the array and calls `az grafana dashboard create` for each entry.
+When the array is empty (default), no dashboards are provisioned.
+
 ## Geneva Integration (1P Teams)
 
 [Geneva](https://eng.ms/docs/products/geneva/getting_started/environments/akslinux) is Microsoft's
@@ -255,7 +248,7 @@ and query the **Metrics** or **Logs** database.
 │   ├── grafana.bicep             # Managed Grafana + user admin roles
 │   ├── role-assignments.bicep    # ADX RBAC (adx-mon, Grafana, user viewers)
 │   ├── k8s-workloads.bicep       # Deployment script: applies K8s manifests
-│   ├── grafana-config.bicep      # Deployment script: ADX datasource setup
+│   ├── grafana-config.bicep      # Deployment script: ADX datasource + dashboards
 │   └── managed-prometheus.bicep  # Optional: AMW, DCE, DCR, DCRA
 └── k8s/
     ├── crds.yaml                 # adx-mon Custom Resource Definitions
@@ -282,6 +275,7 @@ and query the **Metrics** or **Logs** database.
 | `userPrincipalIds` | `[]` | Azure AD **object IDs** → ADX Viewer + Grafana Admin |
 | `userTenantId` | deploying tenant | Tenant for the listed principals ([cross-tenant](#cross-tenant-users-eg-tme-tenant)) |
 | `enableManagedPrometheus` | `false` | Deploy Managed Prometheus alongside adx-mon |
+| `dashboardDefinitions` | `[]` | Grafana dashboard JSON definitions to provision ([details](#grafana-dashboards)) |
 
 ## Further Reading
 

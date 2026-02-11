@@ -42,6 +42,9 @@ param deployTimestamp string = utcNow()
 @description('Enable Managed Prometheus for AKS metrics collection.')
 param enableManagedPrometheus bool = false
 
+@description('Grafana dashboard definitions to provision. Each entry needs a title and a definition (JSON model object).')
+param dashboardDefinitions array = []
+
 // ---------- Resource Group ----------
 
 resource rg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
@@ -147,7 +150,7 @@ module k8sWorkloads 'modules/k8s-workloads.bicep' = {
   }
 }
 
-// ---------- Grafana Config — datasource only, no dashboards ----------
+// ---------- Grafana Config — datasource + optional dashboards ----------
 
 module grafanaConfig 'modules/grafana-config.bicep' = {
   scope: rg
@@ -163,6 +166,7 @@ module grafanaConfig 'modules/grafana-config.bicep' = {
     deployerIdentityId: identity.outputs.deployerIdentityId
     deployerPrincipalId: identity.outputs.deployerPrincipalId
     forceUpdateTag: deployTimestamp
+    dashboardDefinitions: dashboardDefinitions
   }
 }
 
