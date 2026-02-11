@@ -31,6 +31,7 @@ var collectorYaml = loadTextContent('../k8s/collector.yaml')
 var ksmYaml = loadTextContent('../k8s/ksm.yaml')
 var functionsYaml = loadTextContent('../k8s/functions.yaml')
 var alertruleYaml = loadTextContent('../k8s/sample-alertrule.yaml')
+var demoAppYaml = loadTextContent('../k8s/demo-app.yaml')
 
 resource applyK8sManifests 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
   name: 'apply-k8s-manifests'
@@ -60,6 +61,7 @@ resource applyK8sManifests 'Microsoft.Resources/deploymentScripts@2023-08-01' = 
       { name: 'KSM_YAML', value: ksmYaml }
       { name: 'FUNCTIONS_YAML', value: functionsYaml }
       { name: 'ALERTRULE_YAML', value: alertruleYaml }
+      { name: 'DEMOAPP_YAML', value: demoAppYaml }
     ]
     scriptContent: '''
       set -e
@@ -94,6 +96,12 @@ resource applyK8sManifests 'Microsoft.Resources/deploymentScripts@2023-08-01' = 
 
       echo "=== Applying sample alert rule ==="
       echo "$ALERTRULE_YAML" | sed "s|__ADX_URL__|$ADX_URL|g; s|__CLIENT_ID__|$CLIENT_ID|g; s|__CLUSTER_NAME__|$CLUSTER_NAME|g; s|__REGION__|$REGION|g" | kubectl apply -f -
+
+      echo "=== Applying demo app ==="
+      echo "$DEMOAPP_YAML" | kubectl apply -f -
+
+      echo "=== Annotating CoreDNS for log capture ==="
+      kubectl patch deployment coredns -n kube-system --type merge -p '{"spec":{"template":{"metadata":{"annotations":{"adx-mon/scrape":"true","adx-mon/port":"9153","adx-mon/path":"/metrics","adx-mon/log-destination":"Logs:CoreDNS","adx-mon/log-parsers":""}}}}}' || true
 
       echo "=== Deployment complete. Pod status: ==="
       kubectl get pods -n adx-mon
