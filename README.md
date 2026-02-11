@@ -37,41 +37,26 @@ flowchart LR
     %% Optional: Diagnostic Settings
     AKS -. "control-plane logs" .-> LAW["Log Analytics\nWorkspace"]
 
-    %% Optional: Geneva path
-    AKS -. "StatsD / Fluentd" .-> Geneva["Geneva\n(MDM + Warm Path)"]
-
     style AKS fill:#e8f4fd,stroke:#0078d4
     style MetricsDB fill:#fff3cd,stroke:#d4a017
     style LogsDB fill:#fff3cd,stroke:#d4a017
     style Grafana fill:#d4edda,stroke:#28a745
     style AMW fill:#f0e6ff,stroke:#7b2ff7,stroke-dasharray: 5 5
     style LAW fill:#e8f0fe,stroke:#1a73e8,stroke-dasharray: 5 5
-    style Geneva fill:#fce4ec,stroke:#c62828,stroke-dasharray: 5 5
 ```
 
 **Solid lines** = core adx-mon pipeline (always deployed).
-**Dashed lines** = optional paths — [Managed Prometheus](#optional-managed-prometheus), [Diagnostic Settings](#optional-aks-diagnostic-settings), and [Geneva](#geneva-integration-1p-teams).
+**Dashed lines** = optional paths — [Managed Prometheus](#optional-managed-prometheus) and [Diagnostic Settings](#optional-aks-diagnostic-settings).
 
 Each Prometheus metric becomes its own table in the **Metrics** database (~600+ tables).
 Logs land in tables created per [`log-destination` annotation](#logs-pod-annotations) in the
 **Logs** database. System tables (`Collector`, `Ingestor`, `Kubelet`) are created automatically.
 
-## What Gets Deployed
-
-| Resource | Purpose |
-|----------|---------|
-| **AKS Cluster** | Hosts adx-mon collectors, ingestor, and [kube-state-metrics](https://github.com/kubernetes/kube-state-metrics) |
-| **Azure Data Explorer** | Stores metrics (~600+ auto-created tables) and logs (tables per annotation) |
-| **Managed Grafana** | Visualization — ADX datasource is auto-configured |
-| **Managed Identities** | [Workload identity](https://learn.microsoft.com/en-us/azure/aks/workload-identity-overview) federation — no secrets stored |
-| **Managed Prometheus** *(optional)* | AMW + data-collection pipeline; set `enableManagedPrometheus = true` |
-| **Diagnostic Settings** *(optional)* | Log Analytics workspace + AKS control-plane logs; set `enableDiagnosticSettings = true` |
-
 ## Quick Start
 
 ### Prerequisites
 
-- [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) with Bicep (`az bicep install`)
+- [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) with [Bicep](https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/overview) (`az bicep install`)
 - An Azure subscription with **Contributor** access
 
 ### 1. Configure Parameters
@@ -97,23 +82,8 @@ param userPrincipalIds = [
 ]
 ```
 
-For teams, store Azure AD **principal (object) IDs** in `~/ids.txt` — one per line:
-
-```text
-# ~/ids.txt — principal object IDs only (NOT tenant IDs)
-aaaa1111-bb22-cc33-dd44-eeeeee000001   # teammate
-aaaa1111-bb22-cc33-dd44-eeeeee000002   # you
-```
-
-> ⚠️ **Only principal object IDs go here.** Tenant IDs (e.g., `aaaa1111-…`) are *not* principals.
-
 Each listed principal gets **ADX Viewer** (on both Metrics and Logs databases) and **Grafana Admin**.
-
-#### Cross-tenant users
-
-If principals belong to a different Azure AD tenant, also set
-`userTenantId` (e.g., `param userTenantId = 'bbbb2222-…'`). When omitted it defaults to
-the deploying subscription's tenant.
+For cross-tenant users, also set `userTenantId`.
 
 ### 2. Deploy
 
@@ -138,7 +108,8 @@ This returns:
 | Output | Use |
 |--------|-----|
 | `aksClusterName` | AKS cluster name (for `az aks get-credentials`) |
-| `adxWebExplorerUrl` | Query metrics / logs in the browser |
+| `adxWebExplorerUrl` | Query metrics in the [ADX Web Explorer](https://learn.microsoft.com/en-us/azure/data-explorer/web-query-data) |
+| `adxLogsExplorerUrl` | Query logs in the ADX Web Explorer |
 | `adxClusterUri` | Programmatic access to ADX |
 | `grafanaEndpoint` | Build dashboards (you have Grafana Admin) |
 | `resourceGroupName` | Resource group containing all resources |
@@ -163,6 +134,34 @@ kubectl run -it --rm loadgen --image=curlimages/curl --restart=Never -- \
 
 Open the Grafana dashboard (`grafanaEndpoint` output) to see request rate, CPU, and memory
 respond in real time — side-by-side in ADX and Managed Prometheus.
+
+## Finding Data
+
+### Metrics
+
+**Grafana Explore** — browse all metrics interactively with PromQL or KQL:
+
+```bash
+echo "$(az deployment sub show --name adxmon-deploy -o tsv --query properties.outputs.grafanaEndpoint.value)/explore"
+```
+
+**ADX Web Explorer** — query the Metrics database directly with KQL:
+
+```bash
+az deployment sub show --name adxmon-deploy -o tsv --query properties.outputs.adxWebExplorerUrl.value
+```
+
+### Logs
+
+**Grafana Explore** — same URL as above, select the ADX datasource and switch to the **Logs** database.
+
+**ADX Web Explorer** — query the Logs database directly:
+
+```bash
+az deployment sub show --name adxmon-deploy -o tsv --query properties.outputs.adxLogsExplorerUrl.value
+```
+
+> If `enableDiagnosticSettings = true`, AKS control-plane logs also go to [Log Analytics](#optional-aks-diagnostic-settings).
 
 ## Collecting Your Application Data
 
@@ -193,23 +192,9 @@ annotations:
 > **Important**: `adx-mon/scrape: "true"` is required for **both** metrics and log discovery.
 > Without it, adx-mon will not discover the pod at all — even if `log-destination` is set.
 
-### Collecting Logs from System / Unowned Pods
-
-Pods you don't control (e.g., `kube-system`, managed add-ons) won't have adx-mon annotations.
-To collect their logs, patch the pod template:
-
-```bash
-kubectl patch deployment <name> -n <namespace> --type merge -p '{
-  "spec": {"template": {"metadata": {"annotations": {
-    "adx-mon/scrape": "true",
-    "adx-mon/log-destination": "Logs:<TableName>"
-  }}}}}'
-```
-
-> This causes a rolling restart. There is no label/namespace-based discovery in adx-mon —
-> annotation patching is the only mechanism. See the
-> [adx-mon configuration reference](https://github.com/Azure/adx-mon#configuration) for all
-> available annotations.
+> **System / unowned pods**: Pods without annotations (e.g., `kube-system`) can be patched with
+> `kubectl patch` to add `adx-mon/scrape` + `adx-mon/log-destination`. This causes a rolling restart.
+> See the [adx-mon configuration reference](https://github.com/Azure/adx-mon#configuration) for details.
 
 ## Optional: Managed Prometheus
 
@@ -222,9 +207,9 @@ param enableFullPrometheusMetrics = true   // full scrape profile + pod-annotati
 ```
 
 When enabled, Bicep deploys an [Azure Monitor Workspace (AMW)](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/azure-monitor-workspace-overview),
-data-collection endpoint/rule, and links the AMW to Grafana. Setting `enableFullPrometheusMetrics`
-additionally applies the full metrics profile and pod-annotation scraping via
-`ama-metrics-settings-configmap`, so custom app metrics (e.g., `nginx_http_requests_total`)
+[data-collection endpoint/rule](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/data-collection-rule-overview), and links the AMW to Grafana. Setting `enableFullPrometheusMetrics`
+additionally applies the [full metrics profile](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-default) and pod-annotation scraping via
+[`ama-metrics-settings-configmap`](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-configuration), so custom app metrics (e.g., `nginx_http_requests_total`)
 appear in both ADX **and** Managed Prometheus — a true dual-pipeline.
 
 See [COMPARISONS.md](COMPARISONS.md) for a detailed coverage comparison.
@@ -240,7 +225,7 @@ param enableDiagnosticSettings = true
 ```
 
 When enabled, Bicep deploys a Log Analytics workspace and configures these categories:
-`kube-audit-admin`, `kube-controller-manager`, `cluster-autoscaler`, `guard`.
+[`kube-audit-admin`](https://learn.microsoft.com/en-us/azure/aks/monitor-aks-reference#resource-logs), `kube-controller-manager`, `cluster-autoscaler`, `guard`.
 
 > **Cost note**: `kube-audit-admin` is used instead of `kube-audit` (full), which excludes
 > GET/LIST requests and is [significantly cheaper](https://learn.microsoft.com/en-us/azure/aks/monitor-aks-reference#resource-logs).
@@ -269,27 +254,20 @@ param dashboardDefinitions = [
 
 The deployment script calls `az grafana dashboard create` for each entry.
 
-## Geneva Integration (1P Teams)
+## Future: Geneva Integration
 
-[Geneva](https://eng.ms/docs/products/geneva/getting_started/environments/akslinux) is Microsoft's
-internal monitoring platform. It coexists with adx-mon on the same AKS cluster — each system runs
-independent DaemonSets with no conflicts.
+[Geneva](https://eng.ms/docs/products/geneva/getting_started/environments/akslinux) (Microsoft's internal monitoring platform) can coexist with adx-mon on the same AKS cluster. Each system runs independent DaemonSets with no conflicts.
 
-| Signal  | Geneva Path | How It Works |
-|---------|-------------|--------------|
-| Metrics | StatsD → [MetricsExtension](https://eng.ms/docs/products/geneva/collect/instrument/statsddaemon) → MDM | Apps emit StatsD on UDP 8125; MetricsExtension DaemonSet aggregates and publishes to Geneva MDM |
-| Metrics | Prometheus → [Managed Prometheus](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/prometheus-metrics-overview) → MDM | AKS Managed Prometheus scrapes pods and remote-writes to an AMW backed by Geneva MDM |
-| Logs    | stdout → Fluentd → [MDSD](https://eng.ms/docs/products/geneva/collect/references/agent/linuxmultitenant) → Geneva | Fluentd DaemonSet tails container logs and forwards to MDSD DaemonSet → Geneva warm path |
+| Signal | Geneva Path |
+|--------|-------------|
+| Metrics | StatsD → MetricsExtension → MDM, or Managed Prometheus → AMW → MDM |
+| Logs | stdout → Fluentd → MDSD → Geneva warm path |
 
-**Setup**: Geneva agent deployment uses Kubernetes manifests (Helm/YAML), not Bicep.
-See the [Geneva on AKS guide](https://eng.ms/docs/products/geneva/getting_started/environments/akslinux)
-and the [Geneva onboarding portal](https://portal.microsoftgeneva.com/account/onboard).
+Geneva agent deployment uses Kubernetes manifests (Helm/YAML), not Bicep. See the [Geneva on AKS guide](https://eng.ms/docs/products/geneva/getting_started/environments/akslinux) for setup.
 
 ## Exploring the Data
 
-### ADX Web Explorer
-
-Open the `adxWebExplorerUrl` from deployment outputs, then try:
+Open the `adxWebExplorerUrl` from deployment outputs in the [ADX Web Explorer](https://learn.microsoft.com/en-us/azure/data-explorer/web-query-data), then try:
 
 ```kusto
 // List all metric tables
@@ -300,17 +278,14 @@ ContainerCpuUsageSecondsTotal
 | where Timestamp > ago(5m)
 | take 10
 
-// Counter rate with prom_delta
+// Counter rate with prom_delta (auto-deployed by adx-mon)
 ContainerCpuUsageSecondsTotal
 | where Timestamp > ago(10m)
 | invoke prom_delta()
 | summarize avg(Value) by Namespace, bin(Timestamp, 1m)
 ```
 
-### Grafana
-
-Navigate to the `grafanaEndpoint`, add panels using the pre-configured ADX datasource,
-and query the **Metrics** or **Logs** database.
+> [`prom_delta()`](https://github.com/Azure/adx-mon) is a KQL function auto-deployed by adx-mon for computing Prometheus counter rates.
 
 ## File Structure
 
@@ -343,21 +318,16 @@ and query the **Metrics** or **Logs** database.
 
 ## Parameters
 
+All parameters have sensible defaults. See `main.sample.bicepparam` for the full list. Key parameters:
+
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `resourceGroupName` | `rg-adx-mon` | Resource group name |
-| `location` | `eastus2` | Azure region |
-| `aksClusterName` | `aks-adx-mon` | AKS cluster name |
-| `adxClusterName` | auto-generated | ADX cluster name (lowercase alphanumeric, ≤ 22 chars) |
-| `grafanaName` | `grafana-adx-mon` | Grafana workspace name |
-| `nodeVmSize` | `Standard_D4s_v3` | VM size for AKS system node pool |
-| `nodeCount` | `2` | Number of AKS nodes |
-| `adxSkuName` | `Standard_E2ads_v5` | ADX compute SKU |
-| `adxSkuCapacity` | `2` | ADX instance count |
+| `nodeVmSize` / `nodeCount` | `Standard_D4s_v3` / `2` | AKS node pool sizing |
+| `adxSkuName` / `adxSkuCapacity` | `Standard_E2ads_v5` / `2` | ADX cluster sizing |
 | `userPrincipalIds` | `[]` | Azure AD **object IDs** → ADX Viewer + Grafana Admin |
-| `userTenantId` | deploying tenant | Tenant for the listed principals ([cross-tenant](#cross-tenant-users)) |
+| `userTenantId` | deploying tenant | Tenant for the listed principals (cross-tenant access) |
 | `enableManagedPrometheus` | `false` | Deploy Managed Prometheus alongside adx-mon |
-| `enableFullPrometheusMetrics` | `false` | Full Prometheus metrics profile + pod-annotation scraping ([details](#optional-managed-prometheus)) |
+| `enableFullPrometheusMetrics` | `false` | Full metrics profile + pod-annotation scraping ([details](#optional-managed-prometheus)) |
 | `enableDiagnosticSettings` | `false` | Send AKS control-plane logs to Log Analytics ([details](#optional-aks-diagnostic-settings)) |
 | `dashboardDefinitions` | `[]` | Grafana dashboard JSON definitions to provision ([details](#grafana-dashboards)) |
 

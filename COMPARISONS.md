@@ -37,7 +37,7 @@ Both systems scrape the same Prometheus endpoints. adx-mon stores data in [Azure
 
 ## Metrics Coverage
 
-Both adx-mon and Managed Prometheus scrape standard Kubernetes metric sources. Where they collect the same metric, the underlying data is identical — it comes from the same exporters.
+Where both systems collect the same metric, the underlying data is identical — it comes from the same exporters.
 
 | Category | adx-mon | Managed Prometheus | Notes |
 |----------|---------|-------------------|-------|
@@ -91,15 +91,4 @@ adx-mon's key advantage: metrics and logs in the **same ADX cluster**, queryable
 | Need OOTB community dashboards / PromQL ecosystem | **Managed Prometheus** — 16 auto-provisioned dashboards + PromQL |
 | Want both | ✅ They coexist — set `enableManagedPrometheus = true` |
 
-**Operational note**: adx-mon requires manual agent updates and cluster sizing (Collector DaemonSet, Ingestor StatefulSet, KSM, 9 CRDs). Managed Prometheus auto-manages its `ama-metrics` pods and scales transparently. Both support multi-cluster by pointing all clusters at one backend (ADX cluster or AMW). ADX uses KQL (joins, ML, time-series); AMW uses PromQL (aggregation, rates).
-
----
-
-## References
-
-| Topic | Link |
-|-------|------|
-| adx-mon | https://github.com/Azure/adx-mon |
-| Managed Prometheus overview | https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/prometheus-metrics-overview |
-| Container Insights overview | https://learn.microsoft.com/en-us/azure/azure-monitor/containers/container-insights-overview |
-| Prometheus custom scrape config | https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-configuration |
+**Operational note**: adx-mon requires manual agent updates and cluster sizing (Collector DaemonSet, Ingestor StatefulSet, KSM, 9 CRDs). Managed Prometheus auto-manages its [`ama-metrics`](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-enable) pods and scales transparently. Both support multi-cluster by pointing all clusters at one backend (ADX cluster or AMW). ADX uses KQL (joins, ML, time-series); AMW uses PromQL (aggregation, rates).

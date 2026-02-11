@@ -204,6 +204,7 @@ module grafanaConfig 'modules/grafana-config.bicep' = {
 output aksClusterName string = aks.outputs.aksName
 output adxClusterUri string = adx.outputs.adxUri
 output adxWebExplorerUrl string = 'https://dataexplorer.azure.com/clusters/${replace(adx.outputs.adxUri, 'https://', '')}/databases/Metrics'
+output adxLogsExplorerUrl string = 'https://dataexplorer.azure.com/clusters/${replace(adx.outputs.adxUri, 'https://', '')}/databases/Logs'
 output grafanaEndpoint string = grafana.outputs.grafanaEndpoint
 output resourceGroupName string = rg.name
 #disable-next-line BCP318
