@@ -20,6 +20,10 @@ spec:
         # adx-mon: capture pod stdout/stderr logs
         adx-mon/log-destination: "Logs:DemoApp"
         adx-mon/log-parsers: ""
+        # ama-metrics: scrape for Managed Prometheus (dual-pipeline)
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
     spec:
       containers:
         - name: nginx

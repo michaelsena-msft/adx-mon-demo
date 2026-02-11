@@ -15,3 +15,13 @@ param userPrincipalIds = [
   'aaaa1111-bb22-cc33-dd44-eeeeee000002'
 ]
 // param userTenantId = 'bbbb2222-cccc-dddd-eeee-ffffffffffff'
+
+// Enable Managed Prometheus for AKS metrics collection
+// param enableManagedPrometheus = true
+
+// Enable full Prometheus metrics profile and pod-annotation scraping
+// (requires enableManagedPrometheus = true)
+// param enableFullPrometheusMetrics = false
+
+// Enable AKS control-plane diagnostic settings (logs to Log Analytics)
+// param enableDiagnosticSettings = false

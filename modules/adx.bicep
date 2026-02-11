@@ -23,9 +23,9 @@ resource cluster 'Microsoft.Kusto/clusters@2024-04-13' = {
   }
   properties: {
     engineType: 'V3'
-    // Streaming ingestion is not required — adx-mon uses queued ingestion.
+    // Streaming ingestion enabled for low-latency ingestion with adx-mon.
     // https://learn.microsoft.com/en-us/azure/data-explorer/ingest-data-overview
-    enableStreamingIngest: false
+    enableStreamingIngest: true
     enablePurge: true
   }
 }

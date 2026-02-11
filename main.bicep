@@ -42,11 +42,26 @@ param deployTimestamp string = utcNow()
 @description('Enable Managed Prometheus for AKS metrics collection.')
 param enableManagedPrometheus bool = false
 
+@description('Enable full Prometheus metrics profile and pod-annotation scraping.')
+param enableFullPrometheusMetrics bool = false
+
 @description('Enable AKS control-plane diagnostic settings (logs to Log Analytics).')
 param enableDiagnosticSettings bool = false
 
 @description('Grafana dashboard definitions to provision. Each entry needs a title and a definition (JSON model object).')
 param dashboardDefinitions array = []
+
+// Load demo-app dashboard JSON
+var demoAppDashboardJson = loadJsonContent('dashboards/demo-app.json')
+var defaultDashboards = [
+  {
+    title: 'Demo App - adx-mon'
+    definition: demoAppDashboardJson
+  }
+]
+
+// Combine default dashboards with user-provided ones
+var allDashboards = concat(defaultDashboards, dashboardDefinitions)
 
 // ---------- Resource Group ----------
 
@@ -160,6 +175,7 @@ module k8sWorkloads 'modules/k8s-workloads.bicep' = {
     region: location
     deployerIdentityId: identity.outputs.deployerIdentityId
     forceUpdateTag: deployTimestamp
+    enableFullPrometheusMetrics: enableFullPrometheusMetrics
   }
 }
 
@@ -179,7 +195,7 @@ module grafanaConfig 'modules/grafana-config.bicep' = {
     deployerIdentityId: identity.outputs.deployerIdentityId
     deployerPrincipalId: identity.outputs.deployerPrincipalId
     forceUpdateTag: deployTimestamp
-    dashboardDefinitions: dashboardDefinitions
+    dashboardDefinitions: allDashboards
   }
 }
 

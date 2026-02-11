@@ -3,3 +3,4 @@ commands.txt
 main.bicepparam
 *.json
 !bicepconfig.json
+!dashboards/*.json
