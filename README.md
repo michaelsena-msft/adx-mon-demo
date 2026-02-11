@@ -25,7 +25,7 @@ flowchart LR
     CS --> ING
 
     ING -- batch write --> MetricsDB[("ADX\nMetrics DB\n~600 tables")]
-    ING -- batch write --> LogsDB[("ADX\nLogs DB\n4 tables")]
+    ING -- batch write --> LogsDB[("ADX\nLogs DB")]
 
     MetricsDB --> Grafana["Managed\nGrafana"]
     LogsDB --> Grafana
@@ -53,18 +53,19 @@ flowchart LR
 **Dashed lines** = optional paths — [Managed Prometheus](#optional-managed-prometheus), [Diagnostic Settings](#optional-aks-diagnostic-settings), and [Geneva](#geneva-integration-1p-teams).
 
 Each Prometheus metric becomes its own table in the **Metrics** database (~600+ tables).
-Logs land in four tables (`Collector`, `Ingestor`, `Kubelet`, `AdxmonIngestorTableDetails`)
-in the **Logs** database.
+Logs land in tables created per [`log-destination` annotation](#logs-pod-annotations) in the
+**Logs** database. System tables (`Collector`, `Ingestor`, `Kubelet`) are created automatically.
 
 ## What Gets Deployed
 
 | Resource | Purpose |
 |----------|---------|
 | **AKS Cluster** | Hosts adx-mon collectors, ingestor, and [kube-state-metrics](https://github.com/kubernetes/kube-state-metrics) |
-| **Azure Data Explorer** | Stores metrics (~600+ auto-created tables) and logs (4 tables) |
+| **Azure Data Explorer** | Stores metrics (~600+ auto-created tables) and logs (tables per annotation) |
 | **Managed Grafana** | Visualization — ADX datasource is auto-configured |
 | **Managed Identities** | [Workload identity](https://learn.microsoft.com/en-us/azure/aks/workload-identity-overview) federation — no secrets stored |
 | **Managed Prometheus** *(optional)* | AMW + data-collection pipeline; set `enableManagedPrometheus = true` |
+| **Diagnostic Settings** *(optional)* | Log Analytics workspace + AKS control-plane logs; set `enableDiagnosticSettings = true` |
 
 ## Quick Start
 
@@ -106,11 +107,13 @@ aaaa1111-bb22-cc33-dd44-eeeeee000002   # you
 
 > ⚠️ **Only principal object IDs go here.** Tenant IDs (e.g., `aaaa1111-…`) are *not* principals.
 
-Each listed principal gets **ADX AllDatabasesViewer** and **Grafana Admin**.
+Each listed principal gets **ADX Viewer** (on both Metrics and Logs databases) and **Grafana Admin**.
 
-> **Cross-tenant users** — If principals belong to a different Azure AD tenant, also set
-> `userTenantId` (e.g., `param userTenantId = 'bbbb2222-…'`). When omitted it defaults to
-> the deploying subscription's tenant.
+#### Cross-tenant users
+
+If principals belong to a different Azure AD tenant, also set
+`userTenantId` (e.g., `param userTenantId = 'bbbb2222-…'`). When omitted it defaults to
+the deploying subscription's tenant.
 
 ### 2. Deploy
 
@@ -134,9 +137,12 @@ This returns:
 
 | Output | Use |
 |--------|-----|
+| `aksClusterName` | AKS cluster name (for `az aks get-credentials`) |
 | `adxWebExplorerUrl` | Query metrics / logs in the browser |
-| `grafanaEndpoint` | Build dashboards (you have Grafana Admin) |
 | `adxClusterUri` | Programmatic access to ADX |
+| `grafanaEndpoint` | Build dashboards (you have Grafana Admin) |
+| `resourceGroupName` | Resource group containing all resources |
+| `azureMonitorWorkspaceId` | AMW resource ID (only when Managed Prometheus is enabled) |
 
 ## Collecting Your Application Data
 
@@ -298,6 +304,7 @@ and query the **Metrics** or **Logs** database.
     ├── ingestor.yaml             # Ingestor StatefulSet
     ├── collector.yaml            # Collector DaemonSet + Singleton
     ├── ksm.yaml                  # kube-state-metrics (auto-sharded)
+    ├── demo-app.yaml             # Sample nginx app with adx-mon annotations
     ├── functions.yaml            # Sample Function + ManagementCommand CRs
     └── sample-alertrule.yaml     # Sample AlertRule for pod restart detection
 ```
@@ -316,7 +323,7 @@ and query the **Metrics** or **Logs** database.
 | `adxSkuName` | `Standard_E2ads_v5` | ADX compute SKU |
 | `adxSkuCapacity` | `2` | ADX instance count |
 | `userPrincipalIds` | `[]` | Azure AD **object IDs** → ADX Viewer + Grafana Admin |
-| `userTenantId` | deploying tenant | Tenant for the listed principals ([cross-tenant](#cross-tenant-users-eg-tme-tenant)) |
+| `userTenantId` | deploying tenant | Tenant for the listed principals ([cross-tenant](#cross-tenant-users)) |
 | `enableManagedPrometheus` | `false` | Deploy Managed Prometheus alongside adx-mon |
 | `enableDiagnosticSettings` | `false` | Send AKS control-plane logs to Log Analytics ([details](#optional-aks-diagnostic-settings)) |
 | `dashboardDefinitions` | `[]` | Grafana dashboard JSON definitions to provision ([details](#grafana-dashboards)) |
