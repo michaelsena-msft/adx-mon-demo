@@ -1,6 +1,6 @@
 # adx-mon vs Managed Prometheus
 
-A side-by-side comparison for teams choosing between [adx-mon](https://github.com/Azure/adx-mon) and [Azure Managed Prometheus](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/prometheus-metrics-overview) on AKS.
+A side-by-side comparison for teams choosing between [adx-mon](https://github.com/Azure/adx-mon) and [Azure Managed Prometheus](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/prometheus-metrics-overview) on AKS. This repo deploys both systems with a single Bicep command — see [README.md](README.md) for setup.
 
 > **TL;DR** — Both collect the same core Kubernetes metrics. adx-mon adds logs and KQL analytics in one store. Managed Prometheus adds turnkey dashboards, alerts, and zero operational overhead. They can run side-by-side.
 
@@ -46,7 +46,7 @@ Where both systems collect the same metric, the underlying data is identical —
 | **Kubelet health** | ✅ kubelet `/metrics/resource` | ✅ kubelet | Volume stats, runtime ops, pod start latency |
 | **Kubernetes object state** | ✅ [KSM](https://github.com/kubernetes/kube-state-metrics) (deployed) | ✅ KSM (deployed) | Pod phase, deployment replicas, node conditions, etc. |
 | **kube-apiserver** | ✅ Collector Singleton | ⚠️ [Preview](https://learn.microsoft.com/en-us/azure/aks/control-plane-metrics-monitor) | adx-mon scrapes directly; MP requires enabling Control Plane Metrics (preview) |
-| **Node-level (disk, load, network)** | ❌ Not collected | ✅ [node-exporter](https://github.com/prometheus/node_exporter) | Biggest gap — adx-mon lacks `node_load*`, `node_disk_*`, `node_filesystem_*`. Mitigated by deploying node-exporter with `adx-mon/scrape: "true"` |
+| **Node-level (disk, load, network)** | ❌ Not collected | ✅ [node-exporter](https://github.com/prometheus/node_exporter) | Biggest gap — adx-mon lacks `node_load*`, `node_disk_*`, `node_filesystem_*`. Mitigated by deploying node-exporter with `adx-mon/scrape: "true"` ([details](README.md#metrics-pod-annotations)) |
 | **Application metrics** | ✅ Pod annotations | ⚠️ [Custom ConfigMap](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-configuration) | adx-mon: annotate pods. MP: edit `ama-metrics-settings-configmap` |
 
 ---
@@ -89,6 +89,6 @@ adx-mon's key advantage: metrics and logs in the **same ADX cluster**, queryable
 | Want cross-signal alerting (metrics + logs) | **adx-mon** — KQL with built-in ML ([`series_decompose_anomalies`](https://learn.microsoft.com/en-us/kusto/query/series-decompose-anomalies-function)) |
 | Cost-sensitive with high-cardinality metrics | **adx-mon** — fixed ADX compute + storage vs [per-sample ingestion](https://azure.microsoft.com/en-us/pricing/details/monitor/) |
 | Need OOTB community dashboards / PromQL ecosystem | **Managed Prometheus** — 16 auto-provisioned dashboards + PromQL |
-| Want both | ✅ They coexist — set `enableManagedPrometheus = true` |
+| Want both | ✅ They coexist — set [`enableManagedPrometheus = true`](README.md#optional-managed-prometheus) |
 
 **Operational note**: adx-mon requires manual agent updates and cluster sizing (Collector DaemonSet, Ingestor StatefulSet, KSM, 9 CRDs). Managed Prometheus auto-manages its [`ama-metrics`](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-enable) pods and scales transparently. Both support multi-cluster by pointing all clusters at one backend (ADX cluster or AMW). ADX uses KQL (joins, ML, time-series); AMW uses PromQL (aggregation, rates).

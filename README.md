@@ -163,6 +163,28 @@ az deployment sub show --name adxmon-deploy -o tsv --query properties.outputs.ad
 
 > If `enableDiagnosticSettings = true`, AKS control-plane logs also go to [Log Analytics](#optional-aks-diagnostic-settings).
 
+### Sample KQL Queries
+
+Once in the ADX Web Explorer, try:
+
+```kusto
+// List all metric tables
+.show tables | sort by TableName
+
+// Sample a metric
+ContainerCpuUsageSecondsTotal
+| where Timestamp > ago(5m)
+| take 10
+
+// Counter rate with prom_delta (auto-deployed by adx-mon)
+ContainerCpuUsageSecondsTotal
+| where Timestamp > ago(10m)
+| invoke prom_delta()
+| summarize avg(Value) by Namespace, bin(Timestamp, 1m)
+```
+
+> [`prom_delta()`](https://github.com/Azure/adx-mon) is a KQL function auto-deployed by adx-mon for computing Prometheus counter rates.
+
 ## Collecting Your Application Data
 
 ### Metrics (Pod Annotations)
@@ -207,10 +229,10 @@ param enableFullPrometheusMetrics = true   // full scrape profile + pod-annotati
 ```
 
 When enabled, Bicep deploys an [Azure Monitor Workspace (AMW)](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/azure-monitor-workspace-overview),
-[data-collection endpoint/rule](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/data-collection-rule-overview), and links the AMW to Grafana. Setting `enableFullPrometheusMetrics`
-additionally applies the [full metrics profile](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-default) and pod-annotation scraping via
-[`ama-metrics-settings-configmap`](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-configuration), so custom app metrics (e.g., `nginx_http_requests_total`)
-appear in both ADX **and** Managed Prometheus — a true dual-pipeline.
+[data-collection endpoint/rule](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/data-collection-rule-overview), and links the AMW to Grafana.
+Setting `enableFullPrometheusMetrics` additionally applies the [full metrics profile](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-default)
+and pod-annotation scraping via [`ama-metrics-settings-configmap`](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-configuration).
+This means custom app metrics (e.g., `nginx_http_requests_total`) appear in both ADX **and** Managed Prometheus — a true dual-pipeline.
 
 See [COMPARISONS.md](COMPARISONS.md) for a detailed coverage comparison.
 
@@ -265,28 +287,6 @@ The deployment script calls `az grafana dashboard create` for each entry.
 
 Geneva agent deployment uses Kubernetes manifests (Helm/YAML), not Bicep. See the [Geneva on AKS guide](https://eng.ms/docs/products/geneva/getting_started/environments/akslinux) for setup.
 
-## Exploring the Data
-
-Open the `adxWebExplorerUrl` from deployment outputs in the [ADX Web Explorer](https://learn.microsoft.com/en-us/azure/data-explorer/web-query-data), then try:
-
-```kusto
-// List all metric tables
-.show tables | sort by TableName
-
-// Sample a metric
-ContainerCpuUsageSecondsTotal
-| where Timestamp > ago(5m)
-| take 10
-
-// Counter rate with prom_delta (auto-deployed by adx-mon)
-ContainerCpuUsageSecondsTotal
-| where Timestamp > ago(10m)
-| invoke prom_delta()
-| summarize avg(Value) by Namespace, bin(Timestamp, 1m)
-```
-
-> [`prom_delta()`](https://github.com/Azure/adx-mon) is a KQL function auto-deployed by adx-mon for computing Prometheus counter rates.
-
 ## File Structure
 
 ```
@@ -324,7 +324,7 @@ All parameters have sensible defaults. See `main.sample.bicepparam` for the full
 |-----------|---------|-------------|
 | `nodeVmSize` / `nodeCount` | `Standard_D4s_v3` / `2` | AKS node pool sizing |
 | `adxSkuName` / `adxSkuCapacity` | `Standard_E2ads_v5` / `2` | ADX cluster sizing |
-| `userPrincipalIds` | `[]` | Azure AD **object IDs** → ADX Viewer + Grafana Admin |
+| `userPrincipalIds` | `[]` | [Microsoft Entra ID](https://learn.microsoft.com/en-us/entra/fundamentals/new-name) **object IDs** → ADX Viewer + Grafana Admin |
 | `userTenantId` | deploying tenant | Tenant for the listed principals (cross-tenant access) |
 | `enableManagedPrometheus` | `false` | Deploy Managed Prometheus alongside adx-mon |
 | `enableFullPrometheusMetrics` | `false` | Full metrics profile + pod-annotation scraping ([details](#optional-managed-prometheus)) |
