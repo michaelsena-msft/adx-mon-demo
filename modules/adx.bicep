@@ -75,6 +75,34 @@ resource logsBatchingPolicy 'Microsoft.Kusto/clusters/databases/scripts@2024-04-
   }
 }
 
+resource metricsStreamingPolicy 'Microsoft.Kusto/clusters/databases/scripts@2024-04-13' = {
+  name: 'metricsStreamingPolicy'
+  parent: metricsDb
+  properties: {
+    #disable-next-line use-secure-value-for-secure-inputs // Kusto management command, not a secret
+    scriptContent: '.alter database Metrics policy streamingingestion enable'
+    continueOnErrors: false
+    forceUpdateTag: forceUpdateTag
+  }
+  dependsOn: [
+    metricsBatchingPolicy
+  ]
+}
+
+resource logsStreamingPolicy 'Microsoft.Kusto/clusters/databases/scripts@2024-04-13' = {
+  name: 'logsStreamingPolicy'
+  parent: logsDb
+  properties: {
+    #disable-next-line use-secure-value-for-secure-inputs // Kusto management command, not a secret
+    scriptContent: '.alter database Logs policy streamingingestion enable'
+    continueOnErrors: false
+    forceUpdateTag: forceUpdateTag
+  }
+  dependsOn: [
+    logsBatchingPolicy
+  ]
+}
+
 resource promDeltaFunction 'Microsoft.Kusto/clusters/databases/scripts@2024-04-13' = {
   name: 'promDeltaFunction'
   parent: metricsDb
@@ -85,7 +113,7 @@ resource promDeltaFunction 'Microsoft.Kusto/clusters/databases/scripts@2024-04-1
     forceUpdateTag: forceUpdateTag
   }
   dependsOn: [
-    metricsBatchingPolicy
+    metricsStreamingPolicy
   ]
 }
 
