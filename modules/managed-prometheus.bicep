@@ -122,6 +122,9 @@ resource grafanaMonitoringReader 'Microsoft.Authorization/roleAssignments@2022-0
 resource grafanaAmwLink 'Microsoft.Dashboard/grafana@2024-10-01' = {
   name: grafanaName
   location: location
+  sku: {
+    name: 'Standard'
+  }
   properties: {
     grafanaIntegrations: {
       azureMonitorWorkspaceIntegrations: [
