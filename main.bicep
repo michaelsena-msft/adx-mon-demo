@@ -75,7 +75,6 @@ module adx 'modules/adx.bicep' = {
     location: location
     skuName: adxSkuName
     skuCapacity: adxSkuCapacity
-    forceUpdateTag: deployTimestamp
   }
 }
 
