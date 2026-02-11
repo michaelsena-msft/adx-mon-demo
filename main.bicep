@@ -42,6 +42,9 @@ param deployTimestamp string = utcNow()
 @description('Enable Managed Prometheus for AKS metrics collection.')
 param enableManagedPrometheus bool = false
 
+@description('Enable AKS control-plane diagnostic settings (logs to Log Analytics).')
+param enableDiagnosticSettings bool = false
+
 @description('Grafana dashboard definitions to provision. Each entry needs a title and a definition (JSON model object).')
 param dashboardDefinitions array = []
 
@@ -112,6 +115,17 @@ module managedPrometheus 'modules/managed-prometheus.bicep' = if (enableManagedP
     aksClusterName: aks.outputs.aksName
     grafanaPrincipalId: grafana.outputs.grafanaPrincipalId
     grafanaName: grafana.outputs.grafanaName
+  }
+}
+
+// ---------- Diagnostic Settings (optional, needs AKS) ----------
+
+module diagnosticSettings 'modules/diagnostic-settings.bicep' = if (enableDiagnosticSettings) {
+  scope: rg
+  name: 'diagnostic-settings-deployment'
+  params: {
+    location: location
+    aksClusterName: aks.outputs.aksName
   }
 }
 
