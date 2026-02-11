@@ -75,6 +75,7 @@ resource configScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
         echo "Creating ADX datasource..."
         az grafana data-source create -n "$GRAFANA_NAME" -g "$GRAFANA_RG" --definition '{
           "name":"'"$ADX_NAME"'",
+          "uid":"adx-adx-mon",
           "type":"grafana-azure-data-explorer-datasource",
           "access":"proxy",
           "jsonData":{"clusterUrl":"'"$ADX_URL"'"}

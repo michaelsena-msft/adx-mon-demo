@@ -22,13 +22,13 @@
       },
       "datasource": {
         "type": "grafana-azure-data-explorer-datasource",
-        "uid": "efch28p7ii0aoa"
+        "uid": "adx-adx-mon"
       },
       "targets": [
         {
           "datasource": {
             "type": "grafana-azure-data-explorer-datasource",
-            "uid": "efch28p7ii0aoa"
+            "uid": "adx-adx-mon"
           },
           "database": "Metrics",
           "resultFormat": "time_series",
@@ -139,13 +139,13 @@
       },
       "datasource": {
         "type": "grafana-azure-data-explorer-datasource",
-        "uid": "efch28p7ii0aoa"
+        "uid": "adx-adx-mon"
       },
       "targets": [
         {
           "datasource": {
             "type": "grafana-azure-data-explorer-datasource",
-            "uid": "efch28p7ii0aoa"
+            "uid": "adx-adx-mon"
           },
           "database": "Metrics",
           "resultFormat": "time_series",
@@ -256,13 +256,13 @@
       },
       "datasource": {
         "type": "grafana-azure-data-explorer-datasource",
-        "uid": "efch28p7ii0aoa"
+        "uid": "adx-adx-mon"
       },
       "targets": [
         {
           "datasource": {
             "type": "grafana-azure-data-explorer-datasource",
-            "uid": "efch28p7ii0aoa"
+            "uid": "adx-adx-mon"
           },
           "database": "Metrics",
           "resultFormat": "time_series",
@@ -323,13 +323,13 @@
       },
       "datasource": {
         "type": "grafana-azure-data-explorer-datasource",
-        "uid": "efch28p7ii0aoa"
+        "uid": "adx-adx-mon"
       },
       "targets": [
         {
           "datasource": {
             "type": "grafana-azure-data-explorer-datasource",
-            "uid": "efch28p7ii0aoa"
+            "uid": "adx-adx-mon"
           },
           "database": "Logs",
           "resultFormat": "table",
