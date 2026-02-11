@@ -10,5 +10,8 @@ param adxSkuName = 'Standard_E2ads_v5'
 param adxSkuCapacity = 2
 
 // Add principal object IDs here to grant ADX Viewer + Grafana Admin access
-param userPrincipalIds = []
-// param userTenantId = '<your-tenant-id>'
+param userPrincipalIds = [
+  'aaaa1111-bb22-cc33-dd44-eeeeee000001'
+  'aaaa1111-bb22-cc33-dd44-eeeeee000002'
+]
+// param userTenantId = 'bbbb2222-cccc-dddd-eeee-ffffffffffff'
