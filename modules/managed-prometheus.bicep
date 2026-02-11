@@ -138,3 +138,6 @@ resource grafanaAmwLink 'Microsoft.Dashboard/grafana@2024-10-01' = {
 
 @description('Resource ID of the Azure Monitor Workspace.')
 output azureMonitorWorkspaceId string = amw.id
+
+@description('Resource ID of the Data Collection Endpoint.')
+output dataCollectionEndpointId string = dce.id

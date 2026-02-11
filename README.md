@@ -37,6 +37,9 @@ flowchart LR
     %% Optional: Diagnostic Settings
     AKS -. "control-plane logs" .-> LAW["Log Analytics\nWorkspace"]
 
+    %% Optional: Container Insights path
+    AKS -. "container logs\n(ama-logs)" .-> LAW
+
     style AKS fill:#e8f4fd,stroke:#0078d4
     style MetricsDB fill:#fff3cd,stroke:#d4a017
     style LogsDB fill:#fff3cd,stroke:#d4a017
@@ -46,7 +49,7 @@ flowchart LR
 ```
 
 **Solid lines** = core adx-mon pipeline (always deployed).
-**Dashed lines** = optional paths — [Managed Prometheus](#optional-managed-prometheus) and [Diagnostic Settings](#optional-aks-diagnostic-settings).
+**Dashed lines** = optional paths — [Managed Prometheus](#optional-managed-prometheus), [Diagnostic Settings](#optional-aks-diagnostic-settings), and [Container Insights](#optional-container-insights).
 
 Each Prometheus metric becomes its own table in the **Metrics** database (~600+ tables).
 Logs land in tables created per [`log-destination` annotation](#logs-pod-annotations) in the
@@ -114,6 +117,7 @@ This returns:
 | `grafanaEndpoint` | Build dashboards (you have Grafana Admin) |
 | `resourceGroupName` | Resource group containing all resources |
 | `azureMonitorWorkspaceId` | AMW resource ID (only when Managed Prometheus is enabled) |
+| `logAnalyticsPortalUrl` | Log Analytics query portal (when Diagnostic Settings or Container Insights is enabled) |
 
 ### 4. Try It
 
@@ -161,7 +165,14 @@ az deployment sub show --name adxmon-deploy -o tsv --query properties.outputs.ad
 az deployment sub show --name adxmon-deploy -o tsv --query properties.outputs.adxLogsExplorerUrl.value
 ```
 
-> If `enableDiagnosticSettings = true`, AKS control-plane logs also go to [Log Analytics](#optional-aks-diagnostic-settings).
+**Log Analytics** (when Container Insights or Diagnostic Settings is enabled):
+
+```bash
+az deployment sub show --name adxmon-deploy -o tsv --query properties.outputs.logAnalyticsPortalUrl.value
+```
+
+> Container Insights logs land in `ContainerLogV2`, `KubePodInventory`, and `KubeEvents` tables.
+> AKS control-plane logs land in `AzureDiagnostics`.
 
 ### Sample KQL Queries
 
@@ -252,15 +263,42 @@ When enabled, Bicep deploys a Log Analytics workspace and configures these categ
 > **Cost note**: `kube-audit-admin` is used instead of `kube-audit` (full), which excludes
 > GET/LIST requests and is [significantly cheaper](https://learn.microsoft.com/en-us/azure/aks/monitor-aks-reference#resource-logs).
 
+## Optional: Container Insights
+
+[Container Insights](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/container-insights-overview)
+collects container logs and Kubernetes inventory data to a Log Analytics workspace — the log equivalent of what
+[Managed Prometheus](#optional-managed-prometheus) does for metrics.
+
+```bicep
+param enableContainerInsights = true
+```
+
+When enabled, Bicep deploys a [data-collection rule/endpoint](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/data-collection-rule-overview),
+enables the `omsagent` AKS addon (which deploys `ama-logs` DaemonSet pods), and grants Grafana read access to the workspace.
+
+**Tables collected** (the "Logs and events" grouping):
+
+| Table | Contents |
+|-------|----------|
+| `ContainerLogV2` | stdout/stderr from **all** containers (auto-discovered, no annotations needed) |
+| `KubePodInventory` | Pod phase, image, conditions — structured inventory with no adx-mon equivalent |
+| `KubeEvents` | Kubernetes events (scheduled, pulled, started, killed) |
+
+**Namespace filtering**: `kube-system` is excluded to reduce noise. To capture specific `kube-system` workloads
+(e.g., coredns), adjust the DCR's `namespaceFilteringMode` in `modules/container-insights.bicep`.
+
+See [COMPARISONS.md](COMPARISONS.md) for a 3-way coverage comparison.
+
 ## Grafana Dashboards
 
-A bundled **Demo App** dashboard is deployed automatically with six panels arranged side-by-side:
+A bundled **Demo App** dashboard is deployed automatically with panels arranged for side-by-side comparison:
 
-| ADX (via adx-mon) | Managed Prometheus |
-|---|---|
-| Request Rate (`NginxHttpRequestsTotal`) | Request Rate (`nginx_http_requests_total`) |
-| Container CPU | Container CPU |
-| Container Memory | Demo App Logs |
+| ADX (via adx-mon) | Managed Prometheus | Container Insights |
+|---|---|---|
+| Request Rate (`NginxHttpRequestsTotal`) | Request Rate (`nginx_http_requests_total`) | — |
+| Container CPU | Container CPU | — |
+| Container Memory | — | Demo App Logs (`ContainerLogV2`) |
+| Demo App Logs (ADX) | — | — |
 
 The dashboard JSON lives in `dashboards/demo-app.json`. To add your own dashboards, pass
 `dashboardDefinitions` — an array of `{ title, definition }` objects:
@@ -304,7 +342,9 @@ Geneva agent deployment uses Kubernetes manifests (Helm/YAML), not Bicep. See th
 │   ├── k8s-workloads.bicep       # Deployment script: applies K8s manifests
 │   ├── grafana-config.bicep      # Deployment script: ADX datasource + dashboards
 │   ├── managed-prometheus.bicep  # Optional: AMW, DCE, DCR, DCRA
-│   └── diagnostic-settings.bicep # Optional: LAW + AKS control-plane logs
+│   ├── diagnostic-settings.bicep # Optional: AKS control-plane logs to LAW
+│   ├── container-insights.bicep  # Optional: Container logs + K8s inventory to LAW
+│   └── log-analytics.bicep       # Shared LAW (used by diagnostic-settings and container-insights)
 └── k8s/
     ├── crds.yaml                 # adx-mon Custom Resource Definitions
     ├── ingestor.yaml             # Ingestor StatefulSet
@@ -329,6 +369,7 @@ All parameters have sensible defaults. See `main.sample.bicepparam` for the full
 | `enableManagedPrometheus` | `false` | Deploy Managed Prometheus alongside adx-mon |
 | `enableFullPrometheusMetrics` | `false` | Full metrics profile + pod-annotation scraping ([details](#optional-managed-prometheus)) |
 | `enableDiagnosticSettings` | `false` | Send AKS control-plane logs to Log Analytics ([details](#optional-aks-diagnostic-settings)) |
+| `enableContainerInsights` | `false` | Collect container logs + K8s inventory via Container Insights ([details](#optional-container-insights)) |
 | `dashboardDefinitions` | `[]` | Grafana dashboard JSON definitions to provision ([details](#grafana-dashboards)) |
 
 ## Further Reading

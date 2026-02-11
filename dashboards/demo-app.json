@@ -251,7 +251,7 @@
       "gridPos": {
         "x": 0,
         "y": 16,
-        "w": 12,
+        "w": 8,
         "h": 8
       },
       "datasource": {
@@ -313,12 +313,12 @@
     },
     {
       "id": 6,
-      "title": "Demo App Logs (ADX)",
+      "title": "Demo App Logs (ADX via adx-mon)",
       "type": "logs",
       "gridPos": {
-        "x": 12,
+        "x": 8,
         "y": 16,
-        "w": 12,
+        "w": 8,
         "h": 8
       },
       "datasource": {
@@ -350,6 +350,41 @@
             }
           },
           "query": "DemoApp\n| where $__timeFilter(Timestamp)\n| project Timestamp, Body\n| order by Timestamp desc\n| take 100",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": false,
+        "sortOrder": "Descending"
+      }
+    },
+    {
+      "id": 7,
+      "title": "Demo App Logs (Container Insights)",
+      "type": "logs",
+      "gridPos": {
+        "x": 16,
+        "y": 16,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "azure-monitor-oob"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "azure-monitor-oob"
+          },
+          "azureLogAnalytics": {
+            "query": "ContainerLogV2\n| where PodNamespace == \"default\" and PodName startswith \"demo-app\"\n| project TimeGenerated, LogMessage, PodName, ContainerName\n| order by TimeGenerated desc\n| take 100",
+            "resultFormat": "logs",
+            "resource": "/subscriptions/a7856baf-2b8e-485c-a7f9-a45544aaa20b/resourceGroups/rg-adx-mon/providers/Microsoft.OperationalInsights/workspaces/law-adx-mon"
+          },
+          "queryType": "Azure Log Analytics",
           "refId": "A"
         }
       ],

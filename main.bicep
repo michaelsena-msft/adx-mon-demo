@@ -48,6 +48,9 @@ param enableFullPrometheusMetrics bool = false
 @description('Enable AKS control-plane diagnostic settings (logs to Log Analytics).')
 param enableDiagnosticSettings bool = false
 
+@description('Enable Container Insights for AKS log collection (ContainerLogV2, KubePodInventory, KubeEvents).')
+param enableContainerInsights bool = false
+
 @description('Grafana dashboard definitions to provision. Each entry needs a title and a definition (JSON model object).')
 param dashboardDefinitions array = []
 
@@ -133,14 +136,43 @@ module managedPrometheus 'modules/managed-prometheus.bicep' = if (enableManagedP
   }
 }
 
-// ---------- Diagnostic Settings (optional, needs AKS) ----------
+// ---------- Log Analytics Workspace (shared by Diagnostic Settings and Container Insights) ----------
+
+var needsLaw = enableDiagnosticSettings || enableContainerInsights
+
+module logAnalytics 'modules/log-analytics.bicep' = if (needsLaw) {
+  scope: rg
+  name: 'log-analytics-deployment'
+  params: {
+    location: location
+  }
+}
+
+// ---------- Diagnostic Settings (optional, needs AKS + LAW) ----------
 
 module diagnosticSettings 'modules/diagnostic-settings.bicep' = if (enableDiagnosticSettings) {
   scope: rg
   name: 'diagnostic-settings-deployment'
   params: {
-    location: location
     aksClusterName: aks.outputs.aksName
+    #disable-next-line BCP321 BCP318
+    logAnalyticsWorkspaceId: needsLaw ? logAnalytics.outputs.workspaceId : ''
+  }
+}
+
+// ---------- Container Insights (optional, needs AKS + LAW + Grafana; after MP to avoid AKS conflict) ----------
+
+module containerInsights 'modules/container-insights.bicep' = if (enableContainerInsights) {
+  scope: rg
+  name: 'container-insights-deployment'
+  params: {
+    aksClusterName: aks.outputs.aksName
+    location: location
+    #disable-next-line BCP321 BCP318
+    logAnalyticsWorkspaceId: needsLaw ? logAnalytics.outputs.workspaceId : ''
+    grafanaPrincipalId: grafana.outputs.grafanaPrincipalId
+    #disable-next-line BCP318
+    existingDataCollectionEndpointId: enableManagedPrometheus ? managedPrometheus.outputs.dataCollectionEndpointId : ''
   }
 }
 
@@ -209,3 +241,5 @@ output grafanaEndpoint string = grafana.outputs.grafanaEndpoint
 output resourceGroupName string = rg.name
 #disable-next-line BCP318
 output azureMonitorWorkspaceId string = enableManagedPrometheus ? managedPrometheus.outputs.azureMonitorWorkspaceId : ''
+#disable-next-line BCP318
+output logAnalyticsPortalUrl string = needsLaw ? 'https://portal.azure.com/#@${tenant().tenantId}/resource${logAnalytics.outputs.workspaceId}/logs' : ''

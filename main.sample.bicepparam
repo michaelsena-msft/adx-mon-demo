@@ -25,3 +25,6 @@ param userPrincipalIds = [
 
 // Enable AKS control-plane diagnostic settings (logs to Log Analytics)
 // param enableDiagnosticSettings = false
+
+// Enable Container Insights for AKS log collection (ContainerLogV2, KubePodInventory, KubeEvents)
+// param enableContainerInsights = false
