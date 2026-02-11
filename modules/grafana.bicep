@@ -1,5 +1,10 @@
+@description('Name of the Grafana workspace.')
 param grafanaName string
+
+@description('Azure region for the Grafana workspace.')
 param location string
+
+@description('SKU name for the Grafana workspace.')
 param skuName string = 'Standard'
 
 @description('Principal IDs to grant Grafana Admin role')
@@ -36,6 +41,5 @@ resource grafanaAdminRoles 'Microsoft.Authorization/roleAssignments@2022-04-01' 
 }]
 
 output grafanaName string = grafana.name
-output grafanaId string = grafana.id
 output grafanaEndpoint string = grafana.properties.endpoint
 output grafanaPrincipalId string = grafana.identity.principalId

@@ -101,6 +101,3 @@ resource applyK8sManifests 'Microsoft.Resources/deploymentScripts@2023-08-01' = 
     '''
   }
 }
-
-@description('Resource ID of the deployment script')
-output deploymentScriptId string = applyK8sManifests.id

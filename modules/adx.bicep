@@ -118,6 +118,4 @@ resource promDeltaFunction 'Microsoft.Kusto/clusters/databases/scripts@2024-04-1
 }
 
 output adxName string = cluster.name
-output adxId string = cluster.id
 output adxUri string = cluster.properties.uri
-output adxIdentityPrincipalId string = cluster.identity.principalId

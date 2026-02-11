@@ -1,7 +1,16 @@
+@description('Name of the adx-mon workload identity.')
 param adxMonIdentityName string = 'id-adx-mon'
+
+@description('Name of the deployer managed identity for deployment scripts.')
 param deployerIdentityName string = 'id-adx-mon-deployer'
+
+@description('Azure region for all resources.')
 param location string
+
+@description('OIDC issuer URL of the AKS cluster for federated credentials.')
 param aksOidcIssuerUrl string
+
+@description('Name of the AKS cluster for scoped role assignments.')
 param aksClusterName string
 
 // User-Assigned Managed Identity for adx-mon workloads
@@ -71,8 +80,6 @@ resource rgContributorRole 'Microsoft.Authorization/roleAssignments@2022-04-01' 
   }
 }
 
-output adxMonIdentityId string = adxMonIdentity.id
 output adxMonIdentityClientId string = adxMonIdentity.properties.clientId
-output adxMonIdentityPrincipalId string = adxMonIdentity.properties.principalId
 output deployerIdentityId string = deployerIdentity.id
 output deployerPrincipalId string = deployerIdentity.properties.principalId

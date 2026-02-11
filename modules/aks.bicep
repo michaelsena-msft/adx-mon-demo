@@ -50,17 +50,5 @@ resource aks 'Microsoft.ContainerService/managedClusters@2024-09-01' = {
 @description('The name of the AKS cluster.')
 output aksName string = aks.name
 
-@description('The resource ID of the AKS cluster.')
-output aksId string = aks.id
-
 @description('The OIDC issuer URL of the AKS cluster.')
 output oidcIssuerUrl string = aks.properties.oidcIssuerProfile.issuerURL
-
-@description('The object (principal) ID of the kubelet managed identity.')
-output kubeletIdentityObjectId string = aks.properties.identityProfile.kubeletidentity.objectId
-
-@description('The client ID of the kubelet managed identity.')
-output kubeletIdentityClientId string = aks.properties.identityProfile.kubeletidentity.clientId
-
-@description('The name of the auto-generated node resource group.')
-output nodeResourceGroup string = aks.properties.nodeResourceGroup

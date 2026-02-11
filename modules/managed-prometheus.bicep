@@ -19,17 +19,12 @@ param grafanaPrincipalId string
 @description('Name of the existing Grafana workspace to link to the Azure Monitor Workspace.')
 param grafanaName string
 
-// Monitoring Reader role definition ID
 var monitoringReaderRoleId = '43d0d8ad-25c7-4714-9337-8ba259a9fe05'
-
-// ---------- Azure Monitor Workspace ----------
 
 resource amw 'Microsoft.Monitor/accounts@2023-04-03' = {
   name: azureMonitorWorkspaceName
   location: location
 }
-
-// ---------- Data Collection Endpoint ----------
 
 resource dce 'Microsoft.Insights/dataCollectionEndpoints@2024-03-11' = {
   name: dataCollectionEndpointName
@@ -41,8 +36,6 @@ resource dce 'Microsoft.Insights/dataCollectionEndpoints@2024-03-11' = {
     }
   }
 }
-
-// ---------- Data Collection Rule for Prometheus ----------
 
 resource dcr 'Microsoft.Insights/dataCollectionRules@2024-03-11' = {
   name: dataCollectionRuleName
@@ -82,13 +75,9 @@ resource dcr 'Microsoft.Insights/dataCollectionRules@2024-03-11' = {
   }
 }
 
-// ---------- Reference existing AKS cluster ----------
-
 resource aksCluster 'Microsoft.ContainerService/managedClusters@2024-09-01' existing = {
   name: aksClusterName
 }
-
-// ---------- Data Collection Rule Association ----------
 
 resource dcra 'Microsoft.Insights/dataCollectionRuleAssociations@2024-03-11' = {
   name: 'configurationAccessEndpoint'
@@ -108,8 +97,6 @@ resource dcrAssociation 'Microsoft.Insights/dataCollectionRuleAssociations@2024-
   }
 }
 
-// ---------- Enable Azure Monitor Metrics on AKS ----------
-
 resource aksMetricsUpdate 'Microsoft.ContainerService/managedClusters@2024-09-01' = {
   name: aksClusterName
   location: location
@@ -122,8 +109,6 @@ resource aksMetricsUpdate 'Microsoft.ContainerService/managedClusters@2024-09-01
   }
 }
 
-// ---------- Monitoring Reader for Grafana on AMW ----------
-
 resource grafanaMonitoringReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(amw.id, grafanaPrincipalId, monitoringReaderRoleId)
   scope: amw
@@ -133,8 +118,6 @@ resource grafanaMonitoringReader 'Microsoft.Authorization/roleAssignments@2022-0
     principalType: 'ServicePrincipal'
   }
 }
-
-// ---------- Link Grafana to Azure Monitor Workspace ----------
 
 resource grafanaAmwLink 'Microsoft.Dashboard/grafana@2024-10-01' = {
   name: grafanaName
@@ -150,16 +133,5 @@ resource grafanaAmwLink 'Microsoft.Dashboard/grafana@2024-10-01' = {
   }
 }
 
-// ---------- Outputs ----------
-
 @description('Resource ID of the Azure Monitor Workspace.')
 output azureMonitorWorkspaceId string = amw.id
-
-@description('Name of the Azure Monitor Workspace.')
-output azureMonitorWorkspaceName string = amw.name
-
-@description('Resource ID of the Data Collection Rule.')
-output dataCollectionRuleId string = dcr.id
-
-@description('Resource ID of the Data Collection Endpoint.')
-output dataCollectionEndpointId string = dce.id
