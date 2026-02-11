@@ -71,7 +71,7 @@ adx-mon's key advantage: metrics and logs in the **same ADX cluster**, queryable
 | Capability | adx-mon | Managed Prometheus |
 |-----------|---------|-------------------|
 | **OOTB alerts** | ❌ Sample only (pod restarts) | ✅ [Recommended Prometheus alert rules](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/kubernetes-metric-alerts) |
-| **OOTB dashboards** | ❌ Datasource only, no dashboards | ✅ [16 auto-provisioned Grafana dashboards](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-default#dashboards) |
+| **OOTB dashboards** | ⚠️ Bundled demo dashboard; more via JSON import | ✅ [16 auto-provisioned Grafana dashboards](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-default#dashboards) |
 | **Alert language** | KQL ([AlertRule CRD](https://github.com/Azure/adx-mon)) | PromQL ([Prometheus Rule Groups](https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/prometheus-alerts)) |
 | **Cross-signal alerts** | ✅ Join metrics + logs in one query | ❌ Metrics only |
 | **Action Groups** | ⚠️ Custom integration needed | ✅ [Native Azure Action Groups](https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/action-groups) |
@@ -79,32 +79,19 @@ adx-mon's key advantage: metrics and logs in the **same ADX cluster**, queryable
 
 ---
 
-## Operational Trade-offs
-
-| Aspect | adx-mon | Managed Prometheus |
-|--------|---------|-------------------|
-| **In-cluster components** | Collector DaemonSet, Singleton, Ingestor StatefulSet, KSM, 9 CRDs | `ama-metrics` pods (auto-managed) |
-| **Azure resources** | ADX cluster, Managed Identity, Grafana | AMW, DCR, DCE, DCRA, Grafana |
-| **Agent updates** | Manual (container images) | Automatic (Azure-managed) |
-| **Scaling** | Manual (ADX cluster sizing) | Automatic (AMW scales transparently) |
-| **Cost model** | Fixed ADX compute + storage | [Per-sample ingestion](https://azure.microsoft.com/en-us/pricing/details/monitor/) |
-| **Retention** | Configurable, [days to years](https://learn.microsoft.com/en-us/kusto/management/retention-policy) | [18 months max](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/prometheus-metrics-overview#data-retention) |
-| **Query language** | KQL (joins, ML, time-series) | PromQL (aggregation, rates) |
-| **Multi-cluster** | All clusters → one ADX cluster | All clusters → one AMW |
-
----
-
 ## When to Use What
 
 | Scenario | Recommendation |
 |----------|---------------|
-| Want turnkey dashboards & alerts, minimal ops | **Managed Prometheus** |
-| Need metrics + logs in one place with KQL | **adx-mon** |
-| Need long-term retention (>18 months) | **adx-mon** (ADX) |
-| Want cross-signal alerting (metrics + logs) | **adx-mon** |
-| Cost-sensitive with high-cardinality metrics | **adx-mon** (fixed ADX cost) |
-| Need OOTB community dashboards / PromQL ecosystem | **Managed Prometheus** |
+| Want turnkey dashboards & alerts, minimal ops | **Managed Prometheus** — auto-managed agents, auto-scaling, native Action Groups |
+| Need metrics + logs in one place with KQL | **adx-mon** — single ADX cluster, KQL joins across both signals |
+| Need long-term retention (>18 months) | **adx-mon** — ADX retention configurable from days to years (vs 18 months max) |
+| Want cross-signal alerting (metrics + logs) | **adx-mon** — KQL with built-in ML ([`series_decompose_anomalies`](https://learn.microsoft.com/en-us/kusto/query/series-decompose-anomalies-function)) |
+| Cost-sensitive with high-cardinality metrics | **adx-mon** — fixed ADX compute + storage vs [per-sample ingestion](https://azure.microsoft.com/en-us/pricing/details/monitor/) |
+| Need OOTB community dashboards / PromQL ecosystem | **Managed Prometheus** — 16 auto-provisioned dashboards + PromQL |
 | Want both | ✅ They coexist — set `enableManagedPrometheus = true` |
+
+**Operational note**: adx-mon requires manual agent updates and cluster sizing (Collector DaemonSet, Ingestor StatefulSet, KSM, 9 CRDs). Managed Prometheus auto-manages its `ama-metrics` pods and scales transparently. Both support multi-cluster by pointing all clusters at one backend (ADX cluster or AMW). ADX uses KQL (joins, ML, time-series); AMW uses PromQL (aggregation, rates).
 
 ---
 
@@ -114,11 +101,5 @@ adx-mon's key advantage: metrics and logs in the **same ADX cluster**, queryable
 |-------|------|
 | adx-mon | https://github.com/Azure/adx-mon |
 | Managed Prometheus overview | https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/prometheus-metrics-overview |
-| Default Prometheus scrape targets | https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-default |
-| Recommended Kubernetes alert rules | https://learn.microsoft.com/en-us/azure/azure-monitor/containers/kubernetes-metric-alerts |
-| AKS control plane metrics (preview) | https://learn.microsoft.com/en-us/azure/aks/control-plane-metrics-monitor |
 | Container Insights overview | https://learn.microsoft.com/en-us/azure/azure-monitor/containers/container-insights-overview |
-| AKS diagnostic settings | https://learn.microsoft.com/en-us/azure/aks/monitor-aks#azure-monitor-resource-logs |
-| ADX retention policy | https://learn.microsoft.com/en-us/kusto/management/retention-policy |
-| KQL anomaly detection | https://learn.microsoft.com/en-us/kusto/query/series-decompose-anomalies-function |
 | Prometheus custom scrape config | https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-configuration |

@@ -144,6 +144,26 @@ This returns:
 | `resourceGroupName` | Resource group containing all resources |
 | `azureMonitorWorkspaceId` | AMW resource ID (only when Managed Prometheus is enabled) |
 
+### 4. Try It
+
+The demo app responds on `http://demo-app/` inside the cluster. Generate traffic and watch
+the dashboard update:
+
+```bash
+# Get cluster credentials
+az aks get-credentials --resource-group rg-adx-mon --name aks-adx-mon
+
+# Single request
+kubectl run -it --rm curl --image=curlimages/curl --restart=Never -- curl -s http://demo-app/
+
+# Load test — watch Request Rate spike on the dashboard
+kubectl run -it --rm loadgen --image=curlimages/curl --restart=Never -- \
+  sh -c 'for i in $(seq 1 100); do curl -s http://demo-app/ > /dev/null; done; echo Done'
+```
+
+Open the Grafana dashboard (`grafanaEndpoint` output) to see request rate, CPU, and memory
+respond in real time — side-by-side in ADX and Managed Prometheus.
+
 ## Collecting Your Application Data
 
 ### Metrics (Pod Annotations)
@@ -194,17 +214,20 @@ kubectl patch deployment <name> -n <namespace> --type merge -p '{
 ## Optional: Managed Prometheus
 
 [Managed Prometheus](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/prometheus-metrics-overview)
-can run **alongside** adx-mon — the two systems are independent and do not conflict.
+can run **alongside** adx-mon — both scrape the same Prometheus endpoints independently.
 
 ```bicep
 param enableManagedPrometheus = true
+param enableFullPrometheusMetrics = true   // full scrape profile + pod-annotation scraping
 ```
 
 When enabled, Bicep deploys an [Azure Monitor Workspace (AMW)](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/azure-monitor-workspace-overview),
-data-collection endpoint/rule, and links the AMW to Grafana.
-This gives you Azure's built-in dashboards and alert rules in addition to the adx-mon pipeline.
-See [`modules/managed-prometheus.bicep`](modules/managed-prometheus.bicep) for implementation details
-and [COMPARISONS.md](COMPARISONS.md) for a detailed coverage comparison.
+data-collection endpoint/rule, and links the AMW to Grafana. Setting `enableFullPrometheusMetrics`
+additionally applies the full metrics profile and pod-annotation scraping via
+`ama-metrics-settings-configmap`, so custom app metrics (e.g., `nginx_http_requests_total`)
+appear in both ADX **and** Managed Prometheus — a true dual-pipeline.
+
+See [COMPARISONS.md](COMPARISONS.md) for a detailed coverage comparison.
 
 ## Optional: AKS Diagnostic Settings
 
@@ -224,9 +247,16 @@ When enabled, Bicep deploys a Log Analytics workspace and configures these categ
 
 ## Grafana Dashboards
 
-The deployment provisions the ADX datasource automatically. You can also provision custom dashboards
-by passing `dashboardDefinitions` — an array of `{ title, definition }` objects where `definition`
-is a [Grafana dashboard JSON model](https://grafana.com/docs/grafana/latest/dashboards/build-dashboards/view-dashboard-json-model/):
+A bundled **Demo App** dashboard is deployed automatically with six panels arranged side-by-side:
+
+| ADX (via adx-mon) | Managed Prometheus |
+|---|---|
+| Request Rate (`NginxHttpRequestsTotal`) | Request Rate (`nginx_http_requests_total`) |
+| Container CPU | Container CPU |
+| Container Memory | Demo App Logs |
+
+The dashboard JSON lives in `dashboards/demo-app.json`. To add your own dashboards, pass
+`dashboardDefinitions` — an array of `{ title, definition }` objects:
 
 ```bicep
 param dashboardDefinitions = [
@@ -237,8 +267,7 @@ param dashboardDefinitions = [
 ]
 ```
 
-The deployment script loops over the array and calls `az grafana dashboard create` for each entry.
-When the array is empty (default), no dashboards are provisioned.
+The deployment script calls `az grafana dashboard create` for each entry.
 
 ## Geneva Integration (1P Teams)
 
@@ -289,9 +318,11 @@ and query the **Metrics** or **Logs** database.
 ├── main.bicep                    # Subscription-scope orchestrator
 ├── main.sample.bicepparam        # Sample parameters (copy → main.bicepparam)
 ├── bicepconfig.json              # Bicep linter config
+├── dashboards/
+│   └── demo-app.json             # Bundled Grafana dashboard (ADX vs Prometheus)
 ├── modules/
 │   ├── aks.bicep                 # AKS with OIDC + workload identity
-│   ├── adx.bicep                 # ADX cluster + Metrics/Logs databases
+│   ├── adx.bicep                 # ADX cluster + Metrics/Logs databases (streaming ingestion)
 │   ├── identity.bicep            # Managed identities + federated credentials
 │   ├── grafana.bicep             # Managed Grafana + user admin roles
 │   ├── role-assignments.bicep    # ADX RBAC (adx-mon, Grafana, user viewers)
@@ -304,7 +335,8 @@ and query the **Metrics** or **Logs** database.
     ├── ingestor.yaml             # Ingestor StatefulSet
     ├── collector.yaml            # Collector DaemonSet + Singleton
     ├── ksm.yaml                  # kube-state-metrics (auto-sharded)
-    ├── demo-app.yaml             # Sample nginx app with adx-mon annotations
+    ├── demo-app.yaml             # nginx + exporter sidecar with dual-pipeline annotations
+    ├── ama-metrics-settings.yaml # ConfigMap for Managed Prometheus scrape settings
     ├── functions.yaml            # Sample Function + ManagementCommand CRs
     └── sample-alertrule.yaml     # Sample AlertRule for pod restart detection
 ```
@@ -325,6 +357,7 @@ and query the **Metrics** or **Logs** database.
 | `userPrincipalIds` | `[]` | Azure AD **object IDs** → ADX Viewer + Grafana Admin |
 | `userTenantId` | deploying tenant | Tenant for the listed principals ([cross-tenant](#cross-tenant-users)) |
 | `enableManagedPrometheus` | `false` | Deploy Managed Prometheus alongside adx-mon |
+| `enableFullPrometheusMetrics` | `false` | Full Prometheus metrics profile + pod-annotation scraping ([details](#optional-managed-prometheus)) |
 | `enableDiagnosticSettings` | `false` | Send AKS control-plane logs to Log Analytics ([details](#optional-aks-diagnostic-settings)) |
 | `dashboardDefinitions` | `[]` | Grafana dashboard JSON definitions to provision ([details](#grafana-dashboards)) |
 

@@ -91,6 +91,14 @@ defs = json.load(sys.stdin)
 for d in defs:
     title = d['title']
     model = json.dumps(d['definition'])
+    uid = d['definition'].get('uid', '')
+    if uid:
+        print(f'Deleting existing dashboard {uid} (if any)...')
+        subprocess.run([
+            'az', 'grafana', 'dashboard', 'delete',
+            '-n', '$GRAFANA_NAME', '-g', '$GRAFANA_RG',
+            '--dashboard', uid
+        ], capture_output=True)
     print(f'Creating dashboard: {title}')
     subprocess.run([
         'az', 'grafana', 'dashboard', 'create',

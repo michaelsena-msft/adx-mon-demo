@@ -1,7 +1,10 @@
 {
   "title": "Demo App - adx-mon",
   "uid": "demo-app-adxmon",
-  "tags": ["adx-mon", "demo"],
+  "tags": [
+    "adx-mon",
+    "demo"
+  ],
   "timezone": "browser",
   "schemaVersion": 16,
   "version": 1,
@@ -9,54 +12,343 @@
   "panels": [
     {
       "id": 1,
-      "title": "NginxUp Metric (ADX via adx-mon)",
+      "title": "Request Rate (ADX via adx-mon)",
       "type": "timeseries",
-      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
-      "datasource": { "type": "grafana-azure-data-explorer-datasource", "uid": "efch28p7ii0aoa" },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-azure-data-explorer-datasource",
+        "uid": "efch28p7ii0aoa"
+      },
       "targets": [
         {
-          "datasource": { "type": "grafana-azure-data-explorer-datasource", "uid": "efch28p7ii0aoa" },
+          "datasource": {
+            "type": "grafana-azure-data-explorer-datasource",
+            "uid": "efch28p7ii0aoa"
+          },
           "database": "Metrics",
           "resultFormat": "time_series",
           "pluginVersion": "5.0.5",
           "OpenAI": false,
-          "expression": { "where": { "expressions": [], "type": "and" }, "groupBy": { "expressions": [], "type": "and" }, "reduce": { "expressions": [], "type": "and" } },
-          "query": "NginxUp\n| where $__timeFilter(Timestamp)\n| where Cluster == \"aks-adx-mon\"\n| project Timestamp, Value\n| order by Timestamp asc",
+          "expression": {
+            "where": {
+              "expressions": [],
+              "type": "and"
+            },
+            "groupBy": {
+              "expressions": [],
+              "type": "and"
+            },
+            "reduce": {
+              "expressions": [],
+              "type": "and"
+            }
+          },
+          "query": "NginxHttpRequestsTotal\n| where $__timeFilter(Timestamp)\n| where Cluster == \"aks-adx-mon\"\n| invoke prom_delta()\n| summarize Value=sum(Value) by bin(Timestamp, 30s)\n| order by Timestamp asc",
           "refId": "A"
         }
       ],
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "single" }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
       },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "drawStyle": "line",
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "fillOpacity": 10,
-            "showPoints": "auto"
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 20,
+            "showPoints": "never"
           },
-          "unit": "short"
+          "unit": "reqps"
         }
       }
     },
     {
       "id": 2,
-      "title": "Demo App Logs (ADX)",
-      "type": "logs",
-      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
-      "datasource": { "type": "grafana-azure-data-explorer-datasource", "uid": "efch28p7ii0aoa" },
+      "title": "Request Rate (Managed Prometheus)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "amw-adx-mon"
+      },
       "targets": [
         {
-          "datasource": { "type": "grafana-azure-data-explorer-datasource", "uid": "efch28p7ii0aoa" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "amw-adx-mon"
+          },
+          "expr": "sum(rate(nginx_http_requests_total[1m]))",
+          "refId": "A",
+          "legendFormat": "requests/sec"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 20,
+            "showPoints": "never"
+          },
+          "unit": "reqps"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Container CPU (ADX via adx-mon)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-azure-data-explorer-datasource",
+        "uid": "efch28p7ii0aoa"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-data-explorer-datasource",
+            "uid": "efch28p7ii0aoa"
+          },
+          "database": "Metrics",
+          "resultFormat": "time_series",
+          "pluginVersion": "5.0.5",
+          "OpenAI": false,
+          "expression": {
+            "where": {
+              "expressions": [],
+              "type": "and"
+            },
+            "groupBy": {
+              "expressions": [],
+              "type": "and"
+            },
+            "reduce": {
+              "expressions": [],
+              "type": "and"
+            }
+          },
+          "query": "ContainerCpuUsageSecondsTotal\n| where $__timeFilter(Timestamp)\n| where Cluster == \"aks-adx-mon\"\n| where Labels.pod startswith \"demo-app\"\n| where Labels.container == \"nginx\"\n| invoke prom_delta()\n| summarize Value=avg(Value) by bin(Timestamp, 30s), tostring(Labels.pod)\n| order by Timestamp asc",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 20,
+            "showPoints": "never"
+          },
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Container CPU (Managed Prometheus)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "amw-adx-mon"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "amw-adx-mon"
+          },
+          "expr": "rate(container_cpu_usage_seconds_total{pod=~\"demo-app.*\", container=\"nginx\"}[5m])",
+          "refId": "A",
+          "legendFormat": "{{pod}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 20,
+            "showPoints": "never"
+          },
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Container Memory (ADX via adx-mon)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-azure-data-explorer-datasource",
+        "uid": "efch28p7ii0aoa"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-data-explorer-datasource",
+            "uid": "efch28p7ii0aoa"
+          },
+          "database": "Metrics",
+          "resultFormat": "time_series",
+          "pluginVersion": "5.0.5",
+          "OpenAI": false,
+          "expression": {
+            "where": {
+              "expressions": [],
+              "type": "and"
+            },
+            "groupBy": {
+              "expressions": [],
+              "type": "and"
+            },
+            "reduce": {
+              "expressions": [],
+              "type": "and"
+            }
+          },
+          "query": "ContainerMemoryWorkingSetBytes\n| where $__timeFilter(Timestamp)\n| where Cluster == \"aks-adx-mon\"\n| where Labels.pod startswith \"demo-app\"\n| where Labels.container == \"nginx\"\n| summarize Value=avg(Value) by bin(Timestamp, 30s), tostring(Labels.pod)\n| order by Timestamp asc",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 20,
+            "showPoints": "never"
+          },
+          "unit": "bytes"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "Demo App Logs (ADX)",
+      "type": "logs",
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-azure-data-explorer-datasource",
+        "uid": "efch28p7ii0aoa"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-data-explorer-datasource",
+            "uid": "efch28p7ii0aoa"
+          },
           "database": "Logs",
           "resultFormat": "table",
           "pluginVersion": "5.0.5",
           "OpenAI": false,
-          "expression": { "where": { "expressions": [], "type": "and" }, "groupBy": { "expressions": [], "type": "and" }, "reduce": { "expressions": [], "type": "and" } },
+          "expression": {
+            "where": {
+              "expressions": [],
+              "type": "and"
+            },
+            "groupBy": {
+              "expressions": [],
+              "type": "and"
+            },
+            "reduce": {
+              "expressions": [],
+              "type": "and"
+            }
+          },
           "query": "DemoApp\n| where $__timeFilter(Timestamp)\n| project Timestamp, Body\n| order by Timestamp desc\n| take 100",
           "refId": "A"
         }
@@ -65,48 +357,6 @@
         "showTime": true,
         "wrapLogMessage": false,
         "sortOrder": "Descending"
-      }
-    },
-    {
-      "id": 3,
-      "title": "nginx_up Metric (Managed Prometheus)",
-      "type": "timeseries",
-      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "amw-adx-mon" },
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "amw-adx-mon" },
-          "expr": "nginx_up",
-          "refId": "A",
-          "legendFormat": "{{pod}}"
-        }
-      ],
-      "options": {
-        "legend": { "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "single" }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "fillOpacity": 10,
-            "showPoints": "auto"
-          },
-          "unit": "short"
-        }
-      }
-    },
-    {
-      "id": 4,
-      "title": "Instructions",
-      "type": "text",
-      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
-      "options": {
-        "mode": "markdown",
-        "content": "# Demo App Dashboard\n\nThis dashboard shows the demo nginx application being monitored through **two pipelines**:\n\n1. **adx-mon pipeline** (top-left, top-right): Metrics and logs flow to ADX via collector/ingestor\n   - Metric: `NginxUp` from `Metrics.NginxUp` table\n   - Logs: nginx access logs from `Logs.DemoApp` table\n\n2. **Managed Prometheus** (bottom-left): Metrics scraped by ama-metrics to AMW\n   - Metric: `nginx_up` via PromQL (requires `enableFullPrometheusMetrics = true`)\n\n## Expected Values\n- `NginxUp` = 1 (from ADX)\n- `nginx_up` = 1 (from Prometheus, if ConfigMap applied)\n- Logs show collector scrape requests every 30s\n\n## Troubleshooting\nIf `nginx_up` shows no data:\n- Verify `enableFullPrometheusMetrics = true` in deployment\n- Check `ama-metrics-settings-configmap` exists in `kube-system` namespace\n- Confirm demo-app has `prometheus.io/scrape: \\\"true\\\"` annotation"
       }
     }
   ]

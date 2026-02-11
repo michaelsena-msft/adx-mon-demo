@@ -4,7 +4,7 @@ metadata:
   name: demo-app
   namespace: default
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app: demo-app
@@ -13,16 +13,16 @@ spec:
       labels:
         app: demo-app
       annotations:
-        # adx-mon: scrape Prometheus metrics from the stub endpoint
+        # adx-mon: scrape Prometheus metrics from the exporter sidecar
         adx-mon/scrape: "true"
-        adx-mon/port: "8080"
+        adx-mon/port: "9113"
         adx-mon/path: "/metrics"
         # adx-mon: capture pod stdout/stderr logs
         adx-mon/log-destination: "Logs:DemoApp"
         adx-mon/log-parsers: ""
         # ama-metrics: scrape for Managed Prometheus (dual-pipeline)
         prometheus.io/scrape: "true"
-        prometheus.io/port: "8080"
+        prometheus.io/port: "9113"
         prometheus.io/path: "/metrics"
     spec:
       containers:
@@ -41,6 +41,19 @@ spec:
             limits:
               cpu: 50m
               memory: 64Mi
+        - name: exporter
+          image: nginx/nginx-prometheus-exporter:1.5.1
+          args:
+            - "-nginx.scrape-uri=http://localhost:8080/stub_status"
+          ports:
+            - containerPort: 9113
+          resources:
+            requests:
+              cpu: 5m
+              memory: 16Mi
+            limits:
+              cpu: 20m
+              memory: 32Mi
       volumes:
         - name: nginx-config
           configMap:
@@ -58,15 +71,17 @@ data:
 
         # Health / landing page
         location / {
-            return 200 'demo-app OK\n';
+            return 200 'Hello from adx-mon demo!\n';
             add_header Content-Type text/plain;
             access_log /dev/stdout;
         }
 
-        # Stub metrics endpoint (nginx_up 1)
-        location /metrics {
-            return 200 '# HELP nginx_up Whether nginx is up.\n# TYPE nginx_up gauge\nnginx_up 1\n';
-            add_header Content-Type 'text/plain; version=0.0.4';
+        # nginx stub_status for the prometheus exporter sidecar
+        location /stub_status {
+            stub_status;
+            allow 127.0.0.1;
+            deny all;
+            access_log off;
         }
     }
 ---
