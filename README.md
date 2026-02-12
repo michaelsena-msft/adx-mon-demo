@@ -69,24 +69,17 @@ cp main.sample.bicepparam main.bicepparam
 ```
 
 Edit `main.bicepparam` — at minimum you'll want to grant yourself
-**ADX Viewer + Grafana Admin** access by adding your principal ID.
-
-#### Finding Your Principal ID
-
-```bash
-az ad signed-in-user show --query id -o tsv
-```
-
-Add the returned object ID to the parameter file:
+**ADX Viewer + Grafana Admin** access by adding your email (UPN).
 
 ```bicep
-param userPrincipalIds = [
-  '<your-object-id>'
+param userPrincipalNames = [
+  'yourname@yourtenant.onmicrosoft.com'
 ]
 ```
 
-Each listed principal gets **ADX Viewer** (on both Metrics and Logs databases) and **Grafana Admin**.
-For cross-tenant users, also set `userTenantId`.
+The [Microsoft Graph Bicep extension](https://learn.microsoft.com/graph/templates/bicep/whats-new)
+resolves email addresses to object IDs at deploy time — no need to look up GUIDs manually.
+Each listed user gets **ADX Viewer** (on both Metrics and Logs databases) and **Grafana Admin**.
 
 ### 2. Deploy
 
@@ -99,6 +92,12 @@ az deployment sub create \
 ```
 
 Deployment takes **~20 minutes** (ADX cluster provisioning is the bottleneck).
+
+> **Tip**: Add `--no-wait` to return immediately and monitor via `az deployment sub show --name adxmon-deploy`.
+>
+> **Re-deploy note**: Re-deploying may show a "Failed" status due to `RoleAssignmentExists` 409s on
+> Grafana Admin role assignments. This is a [known ARM limitation](https://learn.microsoft.com/en-us/azure/role-based-access-control/troubleshoot) —
+> all resources are correctly configured despite the reported failure.
 
 ### 3. Verify
 
@@ -240,7 +239,10 @@ param enableFullPrometheusMetrics = true   // full scrape profile + pod-annotati
 ```
 
 When enabled, Bicep deploys an [Azure Monitor Workspace (AMW)](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/azure-monitor-workspace-overview),
-[data-collection endpoint/rule](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/data-collection-rule-overview), and links the AMW to Grafana.
+[data-collection endpoint/rule](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/data-collection-rule-overview), links the AMW to Grafana,
+and creates [Prometheus recording rule groups](https://learn.microsoft.com/azure/azure-monitor/containers/prometheus-metrics-scrape-default#recording-rules)
+required by the auto-provisioned Kubernetes Compute dashboards.
+See `modules/prometheus-rules.bicep` for details on why these are declared explicitly.
 Setting `enableFullPrometheusMetrics` additionally applies the [full metrics profile](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-default)
 and pod-annotation scraping via [`ama-metrics-settings-configmap`](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-configuration).
 This means custom app metrics (e.g., `nginx_http_requests_total`) appear in both ADX **and** Managed Prometheus — a true dual-pipeline.
@@ -289,6 +291,16 @@ enables the `omsagent` AKS addon (which deploys `ama-logs` DaemonSet pods), and 
 
 See [COMPARISONS.md](COMPARISONS.md) for a 3-way coverage comparison.
 
+## Optional: Advanced Container Networking Services (ACNS)
+
+[ACNS](https://learn.microsoft.com/azure/aks/advanced-container-networking-services-overview) enables
+network observability for AKS via Hubble/Cilium metrics. When enabled alongside Managed Prometheus,
+the auto-provisioned Kubernetes Networking dashboards in Grafana will populate with flow data.
+
+```bicep
+param enableACNS = true
+```
+
 ## Grafana Dashboards
 
 A bundled **Demo App** dashboard is deployed automatically with panels arranged for side-by-side comparison:
@@ -330,18 +342,23 @@ Geneva agent deployment uses Kubernetes manifests (Helm/YAML), not Bicep. See th
 ```
 ├── main.bicep                    # Subscription-scope orchestrator
 ├── main.sample.bicepparam        # Sample parameters (copy → main.bicepparam)
-├── bicepconfig.json              # Bicep linter config
+├── bicepconfig.json              # Bicep linter config + Graph extension
 ├── dashboards/
 │   └── demo-app.json             # Bundled Grafana dashboard (ADX vs Prometheus)
+├── rules/
+│   ├── node-recording-rules.json       # Node-level recording rules (11 rules)
+│   ├── kubernetes-recording-rules.json # Kubernetes recording rules (19 rules)
+│   └── ux-recording-rules.json         # UX recording rules (18 rules)
 ├── modules/
-│   ├── aks.bicep                 # AKS with OIDC + workload identity
+│   ├── aks.bicep                 # AKS with OIDC + workload identity + optional ACNS
 │   ├── adx.bicep                 # ADX cluster + Metrics/Logs databases (streaming ingestion)
 │   ├── identity.bicep            # Managed identities + federated credentials
-│   ├── grafana.bicep             # Managed Grafana + user admin roles
-│   ├── role-assignments.bicep    # ADX RBAC (adx-mon, Grafana, user viewers)
+│   ├── grafana.bicep             # Managed Grafana workspace
+│   ├── role-assignments.bicep    # ADX RBAC + Grafana Admin (adx-mon, Grafana, users)
 │   ├── k8s-workloads.bicep       # Deployment script: applies K8s manifests
 │   ├── grafana-config.bicep      # Deployment script: ADX datasource + dashboards
-│   ├── managed-prometheus.bicep  # Optional: AMW, DCE, DCR, DCRA
+│   ├── managed-prometheus.bicep  # Optional: AMW, DCE, DCR, DCRA, Grafana link
+│   ├── prometheus-rules.bicep    # Optional: Prometheus recording rules for Kubernetes dashboards
 │   ├── diagnostic-settings.bicep # Optional: AKS control-plane logs to LAW
 │   ├── container-insights.bicep  # Optional: Container logs + K8s inventory to LAW
 │   └── log-analytics.bicep       # Shared LAW (used by diagnostic-settings and container-insights)
@@ -364,10 +381,10 @@ All parameters have sensible defaults. See `main.sample.bicepparam` for the full
 |-----------|---------|-------------|
 | `nodeVmSize` / `nodeCount` | `Standard_D4s_v3` / `2` | AKS node pool sizing |
 | `adxSkuName` / `adxSkuCapacity` | `Standard_E2ads_v5` / `2` | ADX cluster sizing |
-| `userPrincipalIds` | `[]` | [Microsoft Entra ID](https://learn.microsoft.com/en-us/entra/fundamentals/new-name) **object IDs** → ADX Viewer + Grafana Admin |
-| `userTenantId` | deploying tenant | Tenant for the listed principals (cross-tenant access) |
+| `userPrincipalNames` | `[]` | UPN emails (e.g. `alias@tenant.onmicrosoft.com`) → ADX Viewer + Grafana Admin. Resolved via [Microsoft Graph extension](https://learn.microsoft.com/graph/templates/bicep/whats-new) |
 | `enableManagedPrometheus` | `false` | Deploy Managed Prometheus alongside adx-mon |
 | `enableFullPrometheusMetrics` | `false` | Full metrics profile + pod-annotation scraping ([details](#optional-managed-prometheus)) |
+| `enableACNS` | `false` | Enable ACNS network observability ([details](#optional-advanced-container-networking-services-acns)) |
 | `enableDiagnosticSettings` | `false` | Send AKS control-plane logs to Log Analytics ([details](#optional-aks-diagnostic-settings)) |
 | `enableContainerInsights` | `false` | Collect container logs + K8s inventory via Container Insights ([details](#optional-container-insights)) |
 | `dashboardDefinitions` | `[]` | Grafana dashboard JSON definitions to provision ([details](#grafana-dashboards)) |

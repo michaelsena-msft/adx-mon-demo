@@ -1,5 +1,7 @@
 targetScope = 'subscription'
 
+extension microsoftGraphV1
+
 // ---------- Parameters ----------
 
 @description('Name of the resource group.')
@@ -30,11 +32,8 @@ param adxSkuName string = 'Standard_E2ads_v5'
 @description('SKU capacity (instance count) for the ADX cluster.')
 param adxSkuCapacity int = 2
 
-@description('User principal (object) IDs to grant ADX Viewer and Grafana Admin access.')
-param userPrincipalIds string[] = []
-
-@description('Tenant ID for user principals (defaults to current tenant).')
-param userTenantId string = tenant().tenantId
+@description('User principal names (UPN emails) to grant ADX Viewer and Grafana Admin access. For TME tenant, use alias@tme01.onmicrosoft.com.')
+param userPrincipalNames string[] = []
 
 @description('Force update tag for deployment scripts and Kusto scripts.')
 param deployTimestamp string = utcNow()
@@ -48,11 +47,20 @@ param enableFullPrometheusMetrics bool = false
 @description('Enable AKS control-plane diagnostic settings (logs to Log Analytics).')
 param enableDiagnosticSettings bool = false
 
+@description('Enable Advanced Container Networking Services (ACNS) for network observability dashboards.')
+param enableACNS bool = false
+
 @description('Enable Container Insights for AKS log collection (ContainerLogV2, KubePodInventory, KubeEvents).')
 param enableContainerInsights bool = false
 
 @description('Grafana dashboard definitions to provision. Each entry needs a title and a definition (JSON model object).')
 param dashboardDefinitions array = []
+
+// ---------- Resolve UPN emails → object IDs via Microsoft Graph ----------
+
+resource users 'Microsoft.Graph/users@v1.0' existing = [for upn in userPrincipalNames: {
+  userPrincipalName: upn
+}]
 
 // Load demo-app dashboard JSON
 var demoAppDashboardJson = loadJsonContent('dashboards/demo-app.json')
@@ -83,6 +91,7 @@ module aks 'modules/aks.bicep' = {
     location: location
     nodeVmSize: nodeVmSize
     nodeCount: nodeCount
+    enableACNS: enableACNS
   }
 }
 
@@ -119,7 +128,6 @@ module grafana 'modules/grafana.bicep' = {
   params: {
     grafanaName: grafanaName
     location: location
-    adminPrincipalIds: userPrincipalIds
   }
 }
 
@@ -133,6 +141,19 @@ module managedPrometheus 'modules/managed-prometheus.bicep' = if (enableManagedP
     aksClusterName: aks.outputs.aksName
     grafanaPrincipalId: grafana.outputs.grafanaPrincipalId
     grafanaName: grafana.outputs.grafanaName
+  }
+}
+
+// ---------- Prometheus Recording Rules (optional, needs AKS and Managed Prometheus) ----------
+
+module prometheusRules 'modules/prometheus-rules.bicep' = if (enableManagedPrometheus) {
+  scope: rg
+  name: 'prometheus-rules-deployment'
+  params: {
+    location: location
+    azureMonitorWorkspaceId: managedPrometheus.outputs.azureMonitorWorkspaceId
+    aksClusterId: aks.outputs.aksId
+    aksClusterName: aksClusterName
   }
 }
 
@@ -185,8 +206,8 @@ module roleAssignments 'modules/role-assignments.bicep' = {
     adxClusterName: adx.outputs.adxName
     adxMonAppId: identity.outputs.adxMonIdentityClientId
     grafanaPrincipalId: grafana.outputs.grafanaPrincipalId
-    viewerPrincipalIds: userPrincipalIds
-    viewerTenantId: userTenantId
+    grafanaName: grafana.outputs.grafanaName
+    viewerPrincipalIds: [for (upn, i) in userPrincipalNames: users[i].id]
   }
 }
 
@@ -195,9 +216,6 @@ module roleAssignments 'modules/role-assignments.bicep' = {
 module k8sWorkloads 'modules/k8s-workloads.bicep' = {
   scope: rg
   name: 'k8s-workloads-deployment'
-  dependsOn: [
-    roleAssignments
-  ]
   params: {
     location: location
     aksClusterName: aks.outputs.aksName
@@ -216,9 +234,6 @@ module k8sWorkloads 'modules/k8s-workloads.bicep' = {
 module grafanaConfig 'modules/grafana-config.bicep' = {
   scope: rg
   name: 'grafana-config-deployment'
-  dependsOn: [
-    k8sWorkloads
-  ]
   params: {
     location: location
     grafanaName: grafana.outputs.grafanaName

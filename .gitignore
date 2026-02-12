@@ -4,3 +4,4 @@ main.bicepparam
 *.json
 !bicepconfig.json
 !dashboards/*.json
+!rules/*.json

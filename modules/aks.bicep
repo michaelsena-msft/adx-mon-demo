@@ -13,6 +13,9 @@ param nodeCount int = 2
 @description('The Kubernetes version for the AKS cluster.')
 param kubernetesVersion string = '1.33'
 
+@description('Enable Advanced Container Networking Services (ACNS) for network observability.')
+param enableACNS bool = false
+
 resource aks 'Microsoft.ContainerService/managedClusters@2024-09-01' = {
   name: clusterName
   location: location
@@ -43,12 +46,20 @@ resource aks 'Microsoft.ContainerService/managedClusters@2024-09-01' = {
     ]
     networkProfile: {
       networkPlugin: 'azure'
+      advancedNetworking: enableACNS ? {
+        observability: {
+          enabled: true
+        }
+      } : null
     }
   }
 }
 
 @description('The name of the AKS cluster.')
 output aksName string = aks.name
+
+@description('The resource ID of the AKS cluster.')
+output aksId string = aks.id
 
 @description('The OIDC issuer URL of the AKS cluster.')
 output oidcIssuerUrl string = aks.properties.oidcIssuerProfile.issuerURL

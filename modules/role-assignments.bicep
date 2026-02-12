@@ -7,11 +7,11 @@ param adxMonAppId string
 @description('Principal ID of the Grafana managed identity.')
 param grafanaPrincipalId string
 
-@description('User principal IDs to grant ADX Viewer access')
-param viewerPrincipalIds string[] = []
+@description('Name of the Grafana workspace (for admin role assignments).')
+param grafanaName string
 
-@description('Tenant ID for viewer principals')
-param viewerTenantId string = tenant().tenantId
+@description('User principal IDs to grant ADX Viewer and Grafana Admin access')
+param viewerPrincipalIds string[] = []
 
 resource adx 'Microsoft.Kusto/clusters@2024-04-13' existing = {
   name: adxClusterName
@@ -78,7 +78,7 @@ resource userMetricsViewer 'Microsoft.Kusto/clusters/databases/principalAssignme
     principalId: principalId
     principalType: 'User'
     role: 'Viewer'
-    tenantId: viewerTenantId
+    tenantId: tenant().tenantId
   }
 }]
 
@@ -89,6 +89,22 @@ resource userLogsViewer 'Microsoft.Kusto/clusters/databases/principalAssignments
     principalId: principalId
     principalType: 'User'
     role: 'Viewer'
-    tenantId: viewerTenantId
+    tenantId: tenant().tenantId
+  }
+}]
+
+// ---------- Grafana Admin role for user principals ----------
+
+resource grafana 'Microsoft.Dashboard/grafana@2024-10-01' existing = {
+  name: grafanaName
+}
+
+resource grafanaAdminRoles 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for (principalId, i) in viewerPrincipalIds: {
+  name: guid(grafana.id, principalId, '22926164-76b3-42b3-bc55-97df8dab3e41')
+  scope: grafana
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '22926164-76b3-42b3-bc55-97df8dab3e41')
+    principalId: principalId
+    principalType: 'User'
   }
 }]
