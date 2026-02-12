@@ -87,6 +87,15 @@
         },
         "use-stable-vm-image": {
           "level": "error"
+        },
+        "no-conflicting-metadata": {
+          "level": "error"
+        },
+        "nested-deployment-template-scoping": {
+          "level": "error"
+        },
+        "what-if-short-circuit-evaluation": {
+          "level": "error"
         }
       }
     }
