@@ -71,17 +71,24 @@ resource configScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
       echo "Waiting 60s for role propagation..."
       sleep 60
 
-      if ! az grafana data-source show -n "$GRAFANA_NAME" -g "$GRAFANA_RG" --data-source "$ADX_NAME" 2>/dev/null; then
-        echo "Creating ADX datasource..."
-        az grafana data-source create -n "$GRAFANA_NAME" -g "$GRAFANA_RG" --definition '{
+      EXISTING_UID=$(az grafana data-source show -n "$GRAFANA_NAME" -g "$GRAFANA_RG" --data-source "$ADX_NAME" --query uid -o tsv 2>/dev/null || true)
+      if [ -n "$EXISTING_UID" ]; then
+        echo "ADX datasource already exists (uid=$EXISTING_UID), updating..."
+        az grafana data-source update -n "$GRAFANA_NAME" -g "$GRAFANA_RG" --data-source "$EXISTING_UID" --definition '{
           "name":"'"$ADX_NAME"'",
-          "uid":"adx-adx-mon",
+          "uid":"'"$EXISTING_UID"'",
           "type":"grafana-azure-data-explorer-datasource",
           "access":"proxy",
           "jsonData":{"clusterUrl":"'"$ADX_URL"'"}
         }'
       else
-        echo "ADX datasource already exists."
+        echo "Creating ADX datasource..."
+        az grafana data-source create -n "$GRAFANA_NAME" -g "$GRAFANA_RG" --definition '{
+          "name":"'"$ADX_NAME"'",
+          "type":"grafana-azure-data-explorer-datasource",
+          "access":"proxy",
+          "jsonData":{"clusterUrl":"'"$ADX_URL"'"}
+        }'
       fi
 
       # Provision dashboards if any are defined
