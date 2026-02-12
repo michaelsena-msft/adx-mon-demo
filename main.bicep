@@ -47,9 +47,6 @@ param enableFullPrometheusMetrics bool = false
 @description('Enable AKS control-plane diagnostic settings (logs to Log Analytics).')
 param enableDiagnosticSettings bool = false
 
-@description('Enable Advanced Container Networking Services (ACNS) for network observability dashboards.')
-param enableACNS bool = false
-
 @description('Enable Container Insights for AKS log collection (ContainerLogV2, KubePodInventory, KubeEvents).')
 param enableContainerInsights bool = false
 
@@ -91,7 +88,7 @@ module aks 'modules/aks.bicep' = {
     location: location
     nodeVmSize: nodeVmSize
     nodeCount: nodeCount
-    enableACNS: enableACNS
+
   }
 }
 

@@ -9,6 +9,6 @@ param userPrincipalNames = [
 // Optional features — uncomment to enable:
 // param enableManagedPrometheus = true
 // param enableFullPrometheusMetrics = true
-// param enableACNS = true
+
 // param enableContainerInsights = true
 // param enableDiagnosticSettings = true

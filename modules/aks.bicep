@@ -13,8 +13,7 @@ param nodeCount int = 2
 @description('The Kubernetes version for the AKS cluster.')
 param kubernetesVersion string = '1.33'
 
-@description('Enable Advanced Container Networking Services (ACNS) for network observability.')
-param enableACNS bool = false
+
 
 resource aks 'Microsoft.ContainerService/managedClusters@2024-09-01' = {
   name: clusterName
@@ -46,11 +45,12 @@ resource aks 'Microsoft.ContainerService/managedClusters@2024-09-01' = {
     ]
     networkProfile: {
       networkPlugin: 'azure'
-      advancedNetworking: enableACNS ? {
+      advancedNetworking: {
+        enabled: true
         observability: {
           enabled: true
         }
-      } : null
+      }
     }
   }
 }
