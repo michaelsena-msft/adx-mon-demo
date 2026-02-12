@@ -55,6 +55,43 @@ Each Prometheus metric becomes its own table in the **Metrics** database (~680+ 
 Logs land in tables created per [`log-destination` annotation](#logs-pod-annotations) in the
 **Logs** database. System tables (`Collector`, `Ingestor`, `Kubelet`) are created automatically.
 
+## Bicep Module Graph
+
+`main.bicep` orchestrates 12 resource-group-scoped modules. **Solid lines** = always deployed.
+**Dashed lines** = conditionally deployed (enabled by default, can be disabled).
+AKS, ADX, and Grafana deploy in parallel; downstream modules wait for their dependencies.
+
+```mermaid
+flowchart TD
+    main["main.bicep\n(subscription scope)"]
+
+    main --> aks["aks.bicep\nAKS + ACNS"]
+    main --> adx["adx.bicep\nADX + Databases"]
+    main --> grafana["grafana.bicep\nManaged Grafana"]
+    main -.-> law["log-analytics.bicep\nLog Analytics"]
+
+    aks --> identity["identity.bicep\nManaged Identities"]
+
+    aks & grafana -.-> mp["managed-prometheus.bicep\nAMW + DCE/DCR"]
+    mp & aks -.-> rules["prometheus-rules.bicep\n48 Recording Rules"]
+
+    law & aks -.-> diag["diagnostic-settings.bicep\nControl-Plane Logs"]
+    law & aks & grafana -.-> ci["container-insights.bicep\nContainer Logs"]
+    mp -.->|shares DCE| ci
+
+    adx & identity & grafana --> roles["role-assignments.bicep\nADX + Grafana RBAC"]
+
+    aks & adx & identity --> k8s["k8s-workloads.bicep\nadx-mon + demo-app"]
+
+    grafana & adx & identity --> gconfig["grafana-config.bicep\nDatasources + Dashboards"]
+
+    style mp fill:#f0e6ff,stroke:#7b2ff7,stroke-dasharray: 5 5
+    style rules fill:#f0e6ff,stroke:#7b2ff7,stroke-dasharray: 5 5
+    style law fill:#e8f0fe,stroke:#1a73e8,stroke-dasharray: 5 5
+    style diag fill:#e8f0fe,stroke:#1a73e8,stroke-dasharray: 5 5
+    style ci fill:#e8f0fe,stroke:#1a73e8,stroke-dasharray: 5 5
+```
+
 ## Quick Start
 
 ### Prerequisites
