@@ -76,7 +76,7 @@ resource configScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
         echo "ADX datasource already exists (uid=$EXISTING_UID), updating..."
         az grafana data-source update -n "$GRAFANA_NAME" -g "$GRAFANA_RG" --data-source "$EXISTING_UID" --definition '{
           "name":"'"$ADX_NAME"'",
-          "uid":"'"$EXISTING_UID"'",
+          "uid":"adx-adx-mon",
           "type":"grafana-azure-data-explorer-datasource",
           "access":"proxy",
           "jsonData":{"clusterUrl":"'"$ADX_URL"'"}
@@ -85,6 +85,7 @@ resource configScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
         echo "Creating ADX datasource..."
         az grafana data-source create -n "$GRAFANA_NAME" -g "$GRAFANA_RG" --definition '{
           "name":"'"$ADX_NAME"'",
+          "uid":"adx-adx-mon",
           "type":"grafana-azure-data-explorer-datasource",
           "access":"proxy",
           "jsonData":{"clusterUrl":"'"$ADX_URL"'"}
