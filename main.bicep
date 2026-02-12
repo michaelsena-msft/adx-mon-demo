@@ -39,16 +39,16 @@ param userPrincipalNames string[] = []
 param deployTimestamp string = utcNow()
 
 @description('Enable Managed Prometheus for AKS metrics collection.')
-param enableManagedPrometheus bool = false
+param enableManagedPrometheus bool = true
 
 @description('Enable full Prometheus metrics profile and pod-annotation scraping.')
-param enableFullPrometheusMetrics bool = false
+param enableFullPrometheusMetrics bool = true
 
 @description('Enable AKS control-plane diagnostic settings (logs to Log Analytics).')
-param enableDiagnosticSettings bool = false
+param enableDiagnosticSettings bool = true
 
 @description('Enable Container Insights for AKS log collection (ContainerLogV2, KubePodInventory, KubeEvents).')
-param enableContainerInsights bool = false
+param enableContainerInsights bool = true
 
 @description('Grafana dashboard definitions to provision. Each entry needs a title and a definition (JSON model object).')
 param dashboardDefinitions array = []

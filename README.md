@@ -229,14 +229,15 @@ annotations:
 > `kubectl patch` to add `adx-mon/scrape` + `adx-mon/log-destination`. This causes a rolling restart.
 > See the [adx-mon configuration reference](https://github.com/Azure/adx-mon#configuration) for details.
 
-## Optional: Managed Prometheus
+## Managed Prometheus (enabled by default)
 
 [Managed Prometheus](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/prometheus-metrics-overview)
 can run **alongside** adx-mon — both scrape the same Prometheus endpoints independently.
 
+To disable:
 ```bicep
-param enableManagedPrometheus = true
-param enableFullPrometheusMetrics = true   // full scrape profile + pod-annotation scraping
+param enableManagedPrometheus = false
+param enableFullPrometheusMetrics = false
 ```
 
 When enabled, Bicep deploys an [Azure Monitor Workspace (AMW)](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/azure-monitor-workspace-overview),
@@ -250,14 +251,15 @@ This means custom app metrics (e.g., `nginx_http_requests_total`) appear in both
 
 See [COMPARISONS.md](COMPARISONS.md) for a detailed coverage comparison.
 
-## Optional: AKS Diagnostic Settings
+## AKS Diagnostic Settings (enabled by default)
 
 Send AKS control-plane logs to a [Log Analytics workspace](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/log-analytics-overview)
 for audit and troubleshooting. [Microsoft recommends](https://learn.microsoft.com/en-us/azure/aks/monitor-aks#azure-monitor-resource-logs)
 enabling this for all AKS clusters.
 
+To disable:
 ```bicep
-param enableDiagnosticSettings = true
+param enableDiagnosticSettings = false
 ```
 
 When enabled, Bicep deploys a Log Analytics workspace and configures these categories:
@@ -266,14 +268,15 @@ When enabled, Bicep deploys a Log Analytics workspace and configures these categ
 > **Cost note**: `kube-audit-admin` is used instead of `kube-audit` (full), which excludes
 > GET/LIST requests and is [significantly cheaper](https://learn.microsoft.com/en-us/azure/aks/monitor-aks-reference#resource-logs).
 
-## Optional: Container Insights
+## Container Insights (enabled by default)
 
 [Container Insights](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/container-insights-overview)
 collects container logs and Kubernetes inventory data to a Log Analytics workspace — the log equivalent of what
 [Managed Prometheus](#optional-managed-prometheus) does for metrics.
 
+To disable:
 ```bicep
-param enableContainerInsights = true
+param enableContainerInsights = false
 ```
 
 When enabled, Bicep deploys a [data-collection rule/endpoint](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/data-collection-rule-overview),

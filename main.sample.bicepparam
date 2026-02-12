@@ -6,9 +6,8 @@ param userPrincipalNames = [
   'yourname@yourtenant.onmicrosoft.com'
 ]
 
-// Optional features — uncomment to enable:
-// param enableManagedPrometheus = true
-// param enableFullPrometheusMetrics = true
-
-// param enableContainerInsights = true
-// param enableDiagnosticSettings = true
+// All features are enabled by default. Uncomment to disable:
+// param enableManagedPrometheus = false
+// param enableFullPrometheusMetrics = false
+// param enableContainerInsights = false
+// param enableDiagnosticSettings = false
