@@ -24,20 +24,20 @@ flowchart LR
     CD --> ING
     CS --> ING
 
-    ING -- batch write --> MetricsDB[("ADX\nMetrics DB\n~600 tables")]
+    ING -- batch write --> MetricsDB[("ADX\nMetrics DB\n~680 tables")]
     ING -- batch write --> LogsDB[("ADX\nLogs DB")]
 
     MetricsDB --> Grafana["Managed\nGrafana"]
     LogsDB --> Grafana
 
-    %% Optional: Managed Prometheus path
+    %% Managed Prometheus (enabled by default, can be disabled)
     AKS -. "scrape (ama-metrics)" .-> AMW["Azure Monitor\nWorkspace"]
     AMW -. linked .-> Grafana
 
-    %% Optional: Diagnostic Settings
+    %% Diagnostic Settings (enabled by default, can be disabled)
     AKS -. "control-plane logs" .-> LAW["Log Analytics\nWorkspace"]
 
-    %% Optional: Container Insights path
+    %% Container Insights (enabled by default, can be disabled)
     AKS -. "container logs\n(ama-logs)" .-> LAW
 
     style AKS fill:#e8f4fd,stroke:#0078d4
@@ -49,9 +49,9 @@ flowchart LR
 ```
 
 **Solid lines** = core adx-mon pipeline (always deployed).
-**Dashed lines** = optional paths — [Managed Prometheus](#optional-managed-prometheus), [Diagnostic Settings](#optional-aks-diagnostic-settings), and [Container Insights](#optional-container-insights).
+**Dashed lines** = [Managed Prometheus](#managed-prometheus-enabled-by-default), [Diagnostic Settings](#aks-diagnostic-settings-enabled-by-default), and [Container Insights](#container-insights-enabled-by-default) — enabled by default but can be disabled.
 
-Each Prometheus metric becomes its own table in the **Metrics** database (~600+ tables).
+Each Prometheus metric becomes its own table in the **Metrics** database (~680+ tables).
 Logs land in tables created per [`log-destination` annotation](#logs-pod-annotations) in the
 **Logs** database. System tables (`Collector`, `Ingestor`, `Kubelet`) are created automatically.
 
@@ -91,14 +91,10 @@ az deployment sub create \
   --name adxmon-deploy
 ```
 
-Deployment takes **~20 minutes** (ADX cluster provisioning is the bottleneck).
+Deployment takes **~15 minutes** on a fresh deploy (ADX cluster provisioning is the bottleneck).
+Update deploys (re-runs with parameter changes) take **~9 minutes**.
 
 > **Tip**: Add `--no-wait` to return immediately and monitor via `az deployment sub show --name adxmon-deploy`.
->
-> **Re-deploy note**: If you see `RoleAssignmentExists` 409s on re-deploy, this is a
-> [known ARM limitation](https://learn.microsoft.com/en-us/azure/role-based-access-control/troubleshoot)
-> when role assignment GUIDs drift between deployments. All resources are correctly configured.
-> This should not occur on fresh deployments or stable re-deploys — if validated, this note can be removed.
 
 ### 3. Verify
 
@@ -116,8 +112,8 @@ This returns:
 | `adxClusterUri` | Programmatic access to ADX |
 | `grafanaEndpoint` | Build dashboards (you have Grafana Admin) |
 | `resourceGroupName` | Resource group containing all resources |
-| `azureMonitorWorkspaceId` | AMW resource ID (only when Managed Prometheus is enabled) |
-| `logAnalyticsPortalUrl` | Log Analytics query portal (when Diagnostic Settings or Container Insights is enabled) |
+| `azureMonitorWorkspaceId` | AMW resource ID (present when Managed Prometheus is enabled) |
+| `logAnalyticsPortalUrl` | Log Analytics query portal (present when Diagnostic Settings or Container Insights is enabled) |
 
 ### 4. Try It
 
@@ -165,7 +161,7 @@ az deployment sub show --name adxmon-deploy -o tsv --query properties.outputs.ad
 az deployment sub show --name adxmon-deploy -o tsv --query properties.outputs.adxLogsExplorerUrl.value
 ```
 
-**Log Analytics** (when Container Insights or Diagnostic Settings is enabled):
+**Log Analytics** (available when Diagnostic Settings or Container Insights is enabled — both are on by default):
 
 ```bash
 az deployment sub show --name adxmon-deploy -o tsv --query properties.outputs.logAnalyticsPortalUrl.value
@@ -272,7 +268,7 @@ When enabled, Bicep deploys a Log Analytics workspace and configures these categ
 
 [Container Insights](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/container-insights-overview)
 collects container logs and Kubernetes inventory data to a Log Analytics workspace — the log equivalent of what
-[Managed Prometheus](#optional-managed-prometheus) does for metrics.
+[Managed Prometheus](#managed-prometheus-enabled-by-default) does for metrics.
 
 To disable:
 ```bicep
@@ -358,10 +354,10 @@ Geneva agent deployment uses Kubernetes manifests (Helm/YAML), not Bicep. See th
 │   ├── role-assignments.bicep    # ADX RBAC + Grafana Admin (adx-mon, Grafana, users)
 │   ├── k8s-workloads.bicep       # Deployment script: applies K8s manifests
 │   ├── grafana-config.bicep      # Deployment script: ADX datasource + dashboards
-│   ├── managed-prometheus.bicep  # Optional: AMW, DCE, DCR, DCRA, Grafana link
-│   ├── prometheus-rules.bicep    # Optional: Prometheus recording rules for Kubernetes dashboards
-│   ├── diagnostic-settings.bicep # Optional: AKS control-plane logs to LAW
-│   ├── container-insights.bicep  # Optional: Container logs + K8s inventory to LAW
+│   ├── managed-prometheus.bicep  # AMW, DCE, DCR, DCRA, Grafana link (can be disabled)
+│   ├── prometheus-rules.bicep    # Prometheus recording rules for Kubernetes dashboards
+│   ├── diagnostic-settings.bicep # AKS control-plane logs to LAW (can be disabled)
+│   ├── container-insights.bicep  # Container logs + K8s inventory to LAW (can be disabled)
 │   └── log-analytics.bicep       # Shared LAW (used by diagnostic-settings and container-insights)
 └── k8s/
     ├── crds.yaml                 # adx-mon Custom Resource Definitions
@@ -383,10 +379,10 @@ All parameters have sensible defaults. See `main.sample.bicepparam` for the full
 | `nodeVmSize` / `nodeCount` | `Standard_D4s_v3` / `2` | AKS node pool sizing |
 | `adxSkuName` / `adxSkuCapacity` | `Standard_E2ads_v5` / `2` | ADX cluster sizing |
 | `userPrincipalNames` | `[]` | UPN emails (e.g. `alias@tenant.onmicrosoft.com`) → ADX Viewer + Grafana Admin. Resolved via [Microsoft Graph extension](https://learn.microsoft.com/graph/templates/bicep/whats-new) |
-| `enableManagedPrometheus` | `false` | Deploy Managed Prometheus alongside adx-mon |
-| `enableFullPrometheusMetrics` | `false` | Full metrics profile + pod-annotation scraping ([details](#optional-managed-prometheus)) |
-| `enableDiagnosticSettings` | `false` | Send AKS control-plane logs to Log Analytics ([details](#optional-aks-diagnostic-settings)) |
-| `enableContainerInsights` | `false` | Collect container logs + K8s inventory via Container Insights ([details](#optional-container-insights)) |
+| `enableManagedPrometheus` | `true` | Deploy Managed Prometheus alongside adx-mon ([details](#managed-prometheus-enabled-by-default)) |
+| `enableFullPrometheusMetrics` | `true` | Full metrics profile + pod-annotation scraping ([details](#managed-prometheus-enabled-by-default)) |
+| `enableDiagnosticSettings` | `true` | Send AKS control-plane logs to Log Analytics ([details](#aks-diagnostic-settings-enabled-by-default)) |
+| `enableContainerInsights` | `true` | Collect container logs + K8s inventory via Container Insights ([details](#container-insights-enabled-by-default)) |
 | `dashboardDefinitions` | `[]` | Grafana dashboard JSON definitions to provision ([details](#grafana-dashboards)) |
 
 ## Further Reading
