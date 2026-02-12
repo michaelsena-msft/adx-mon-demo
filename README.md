@@ -376,6 +376,8 @@ All parameters have sensible defaults. See `main.sample.bicepparam` for the full
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
+| `location` | `eastus2` | Azure region for all resources |
+| `resourceGroupName` | `rg-adx-mon` | Resource group name |
 | `nodeVmSize` / `nodeCount` | `Standard_D4s_v3` / `2` | AKS node pool sizing |
 | `adxSkuName` / `adxSkuCapacity` | `Standard_E2ads_v5` / `2` | ADX cluster sizing |
 | `userPrincipalNames` | `[]` | UPN emails (e.g. `alias@tenant.onmicrosoft.com`) → ADX Viewer + Grafana Admin. Resolved via [Microsoft Graph extension](https://learn.microsoft.com/graph/templates/bicep/whats-new) |
