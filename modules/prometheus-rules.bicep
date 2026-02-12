@@ -49,6 +49,7 @@ resource nodeRecordingRules 'Microsoft.AlertsManagement/prometheusRuleGroups@202
   name: 'NodeRecordingRulesRuleGroup-${aksClusterName}'
   location: location
   properties: {
+    enabled: true
     scopes: [azureMonitorWorkspaceId, aksClusterId]
     clusterName: aksClusterName
     interval: 'PT1M'
@@ -60,6 +61,7 @@ resource kubernetesRecordingRules 'Microsoft.AlertsManagement/prometheusRuleGrou
   name: 'KubernetesRecordingRulesRuleGroup-${aksClusterName}'
   location: location
   properties: {
+    enabled: true
     scopes: [azureMonitorWorkspaceId, aksClusterId]
     clusterName: aksClusterName
     interval: 'PT1M'
@@ -71,6 +73,7 @@ resource uxRecordingRules 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-
   name: 'UXRecordingRulesRuleGroup-${aksClusterName}'
   location: location
   properties: {
+    enabled: true
     scopes: [azureMonitorWorkspaceId, aksClusterId]
     clusterName: aksClusterName
     interval: 'PT1M'
