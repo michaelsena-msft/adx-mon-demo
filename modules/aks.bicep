@@ -13,8 +13,6 @@ param nodeCount int = 2
 @description('The Kubernetes version for the AKS cluster.')
 param kubernetesVersion string = '1.33'
 
-
-
 resource aks 'Microsoft.ContainerService/managedClusters@2024-09-01' = {
   name: clusterName
   location: location

@@ -30,7 +30,7 @@ resource grafana 'Microsoft.Dashboard/grafana@2024-10-01' existing = {
 
 // Grant deployer identity Grafana Admin to configure datasource
 resource grafanaAdminRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(grafana.id, deployerPrincipalId, 'GrafanaAdmin')
+  name: guid(grafana.id, deployerPrincipalId, '22926164-76b3-42b3-bc55-97df8dab3e41')
   scope: grafana
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '22926164-76b3-42b3-bc55-97df8dab3e41')

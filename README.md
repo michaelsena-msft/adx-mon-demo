@@ -95,9 +95,10 @@ Deployment takes **~20 minutes** (ADX cluster provisioning is the bottleneck).
 
 > **Tip**: Add `--no-wait` to return immediately and monitor via `az deployment sub show --name adxmon-deploy`.
 >
-> **Re-deploy note**: Re-deploying may show a "Failed" status due to `RoleAssignmentExists` 409s on
-> Grafana Admin role assignments. This is a [known ARM limitation](https://learn.microsoft.com/en-us/azure/role-based-access-control/troubleshoot) —
-> all resources are correctly configured despite the reported failure.
+> **Re-deploy note**: If you see `RoleAssignmentExists` 409s on re-deploy, this is a
+> [known ARM limitation](https://learn.microsoft.com/en-us/azure/role-based-access-control/troubleshoot)
+> when role assignment GUIDs drift between deployments. All resources are correctly configured.
+> This should not occur on fresh deployments or stable re-deploys — if validated, this note can be removed.
 
 ### 3. Verify
 
@@ -291,15 +292,12 @@ enables the `omsagent` AKS addon (which deploys `ama-logs` DaemonSet pods), and 
 
 See [COMPARISONS.md](COMPARISONS.md) for a 3-way coverage comparison.
 
-## Optional: Advanced Container Networking Services (ACNS)
+## Advanced Container Networking Services (ACNS)
 
-[ACNS](https://learn.microsoft.com/azure/aks/advanced-container-networking-services-overview) enables
-network observability for AKS via Hubble/Cilium metrics. When enabled alongside Managed Prometheus,
-the auto-provisioned Kubernetes Networking dashboards in Grafana will populate with flow data.
-
-```bicep
-param enableACNS = true
-```
+[ACNS](https://learn.microsoft.com/azure/aks/advanced-container-networking-services-overview) is
+always enabled. It provides network observability for AKS via Hubble/Cilium metrics. When Managed
+Prometheus is also enabled, the auto-provisioned Kubernetes Networking dashboards in Grafana
+populate with flow data automatically.
 
 ## Grafana Dashboards
 
@@ -350,7 +348,7 @@ Geneva agent deployment uses Kubernetes manifests (Helm/YAML), not Bicep. See th
 │   ├── kubernetes-recording-rules.json # Kubernetes recording rules (19 rules)
 │   └── ux-recording-rules.json         # UX recording rules (18 rules)
 ├── modules/
-│   ├── aks.bicep                 # AKS with OIDC + workload identity + optional ACNS
+│   ├── aks.bicep                 # AKS with OIDC + workload identity + ACNS network observability
 │   ├── adx.bicep                 # ADX cluster + Metrics/Logs databases (streaming ingestion)
 │   ├── identity.bicep            # Managed identities + federated credentials
 │   ├── grafana.bicep             # Managed Grafana workspace
@@ -384,7 +382,6 @@ All parameters have sensible defaults. See `main.sample.bicepparam` for the full
 | `userPrincipalNames` | `[]` | UPN emails (e.g. `alias@tenant.onmicrosoft.com`) → ADX Viewer + Grafana Admin. Resolved via [Microsoft Graph extension](https://learn.microsoft.com/graph/templates/bicep/whats-new) |
 | `enableManagedPrometheus` | `false` | Deploy Managed Prometheus alongside adx-mon |
 | `enableFullPrometheusMetrics` | `false` | Full metrics profile + pod-annotation scraping ([details](#optional-managed-prometheus)) |
-| `enableACNS` | `false` | Enable ACNS network observability ([details](#optional-advanced-container-networking-services-acns)) |
 | `enableDiagnosticSettings` | `false` | Send AKS control-plane logs to Log Analytics ([details](#optional-aks-diagnostic-settings)) |
 | `enableContainerInsights` | `false` | Collect container logs + K8s inventory via Container Insights ([details](#optional-container-insights)) |
 | `dashboardDefinitions` | `[]` | Grafana dashboard JSON definitions to provision ([details](#grafana-dashboards)) |

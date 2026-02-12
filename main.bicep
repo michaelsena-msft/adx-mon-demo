@@ -88,7 +88,6 @@ module aks 'modules/aks.bicep' = {
     location: location
     nodeVmSize: nodeVmSize
     nodeCount: nodeCount
-
   }
 }
 
@@ -148,6 +147,7 @@ module prometheusRules 'modules/prometheus-rules.bicep' = if (enableManagedProme
   name: 'prometheus-rules-deployment'
   params: {
     location: location
+    #disable-next-line BCP318
     azureMonitorWorkspaceId: managedPrometheus.outputs.azureMonitorWorkspaceId
     aksClusterId: aks.outputs.aksId
     aksClusterName: aksClusterName
