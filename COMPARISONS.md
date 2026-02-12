@@ -53,7 +53,7 @@ Where both systems collect the same metric, the underlying data is identical —
 | **Kubernetes object state** | ✅ [KSM](https://github.com/kubernetes/kube-state-metrics) (deployed) | ✅ KSM (deployed) | Pod phase, deployment replicas, node conditions, etc. |
 | **kube-apiserver** | ✅ Collector Singleton | ⚠️ [Preview](https://learn.microsoft.com/en-us/azure/aks/control-plane-metrics-monitor) | adx-mon scrapes directly; MP requires enabling Control Plane Metrics (preview) |
 | **Node-level (disk, load, network)** | ❌ Not collected | ✅ [node-exporter](https://github.com/prometheus/node_exporter) | Biggest gap — adx-mon lacks `node_load*`, `node_disk_*`, `node_filesystem_*`. Mitigated by deploying node-exporter with `adx-mon/scrape: "true"` ([details](README.md#metrics-pod-annotations)) |
-| **Application metrics** | ✅ Pod annotations | ⚠️ [Custom ConfigMap](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-configuration) | adx-mon: annotate pods. MP: edit `ama-metrics-settings-configmap` |
+| **Application metrics** | ✅ Pod annotations | ✅ Pod annotations (enabled by default via [`enableFullPrometheusMetrics`](README.md#managed-prometheus-enabled-by-default)) | adx-mon: annotate pods. MP: same annotations scraped automatically |
 
 ---
 
@@ -65,7 +65,7 @@ Managed Prometheus **does not collect logs** — it's metrics-only. Container In
 |-----------|---------|-------------------|-------------------|
 | **Container logs** | ✅ Via pod annotation → dedicated ADX table | ❌ | ✅ `ContainerLogV2` — all containers, auto-discovered |
 | **Kubelet journal** | ✅ Systemd journal → ADX `Kubelet` table | ❌ | ❌ |
-| **Control plane logs** | ❌ Use [Diagnostic Settings](README.md#optional-aks-diagnostic-settings) | ❌ | ❌ Use Diagnostic Settings |
+| **Control plane logs** | ❌ Use [Diagnostic Settings](README.md#aks-diagnostic-settings-enabled-by-default) | ❌ | ❌ Use Diagnostic Settings |
 | **Kubernetes inventory** | ⚠️ KSM metrics only (time-series, not snapshots) | ❌ | ✅ `KubePodInventory`, `KubeEvents`, `KubeNodeInventory` |
 | **Metric + log correlation** | ✅ Single KQL query across both | ❌ | ⚠️ Separate workspace from metrics |
 | **Wildcard log capture** | ❌ Requires per-pod annotation | ❌ | ✅ All pods captured by default |
@@ -79,7 +79,7 @@ Managed Prometheus **does not collect logs** — it's metrics-only. Container In
 | Capability | adx-mon | Managed Prometheus |
 |-----------|---------|-------------------|
 | **OOTB alerts** | ❌ Sample only (pod restarts) | ✅ [Recommended Prometheus alert rules](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/kubernetes-metric-alerts) |
-| **OOTB dashboards** | ⚠️ Bundled demo dashboard; more via JSON import | ✅ [16 auto-provisioned Grafana dashboards](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-default#dashboards) |
+| **OOTB dashboards** | ⚠️ Bundled demo dashboard; more via JSON import | ✅ [Auto-provisioned Grafana dashboards](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-default#dashboards) (45+ Kubernetes/Azure dashboards) |
 | **Alert language** | KQL ([AlertRule CRD](https://github.com/Azure/adx-mon)) | PromQL ([Prometheus Rule Groups](https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/prometheus-alerts)) |
 | **Cross-signal alerts** | ✅ Join metrics + logs in one query | ❌ Metrics only |
 | **Action Groups** | ⚠️ Custom integration needed | ✅ [Native Azure Action Groups](https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/action-groups) |
@@ -98,7 +98,7 @@ Managed Prometheus **does not collect logs** — it's metrics-only. Container In
 | Need long-term retention (>18 months) | **adx-mon** — ADX retention configurable from days to years (vs 18 months max) |
 | Want cross-signal alerting (metrics + logs) | **adx-mon** — KQL with built-in ML ([`series_decompose_anomalies`](https://learn.microsoft.com/en-us/kusto/query/series-decompose-anomalies-function)) |
 | Cost-sensitive with high-cardinality metrics | **adx-mon** — fixed ADX compute + storage vs [per-sample ingestion](https://azure.microsoft.com/en-us/pricing/details/monitor/) |
-| Need OOTB community dashboards / PromQL ecosystem | **Managed Prometheus** — 16 auto-provisioned dashboards + PromQL |
-| Want all three | ✅ They coexist — set [`enableManagedPrometheus`](README.md#optional-managed-prometheus) and [`enableContainerInsights`](README.md#optional-container-insights) |
+| Need OOTB community dashboards / PromQL ecosystem | **Managed Prometheus** — 45+ auto-provisioned dashboards + PromQL |
+| Want all three | ✅ They coexist out of the box — all three are [enabled by default](README.md#managed-prometheus-enabled-by-default) |
 
 **Operational note**: adx-mon requires manual agent updates and cluster sizing (Collector DaemonSet, Ingestor StatefulSet, KSM, 9 CRDs). Managed Prometheus and Container Insights auto-manage their agents ([`ama-metrics`](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-enable), [`ama-logs`](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/container-insights-overview)) and scale transparently. ADX uses KQL (joins, ML, time-series); AMW uses PromQL (aggregation, rates); LAW uses KQL.
