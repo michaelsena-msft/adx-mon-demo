@@ -28,7 +28,5 @@ param alertOwnerIds = [
 
 // All features are enabled by default. Uncomment to disable:
 // param enableManagedPrometheus = false
-// param enableRecommendedMetricAlerts = false
-// param enableFullPrometheusMetrics = false
 // param enableContainerInsights = false
 // param enableDiagnosticSettings = false

@@ -333,7 +333,6 @@ can run **alongside** adx-mon — both scrape the same Prometheus endpoints inde
 To disable:
 ```bicep
 param enableManagedPrometheus = false
-param enableFullPrometheusMetrics = false
 ```
 
 When enabled, Bicep deploys an [Azure Monitor Workspace (AMW)](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/azure-monitor-workspace-overview),
@@ -342,16 +341,11 @@ and creates [Prometheus recording rule groups](https://learn.microsoft.com/azure
 required by the auto-provisioned Kubernetes Compute dashboards.
 See `modules/prometheus-rules.bicep` for details on why these are declared explicitly.
 
-By default, this deployment also enables Azure Monitor [recommended AKS metric alerts](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/kubernetes-metric-alerts)
+This deployment also enables Azure Monitor [recommended AKS metric alerts](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/kubernetes-metric-alerts)
 using Microsoft's published template and adds one simple custom Prometheus alert rule group as an example.
-To disable recommended metric alerts:
-
-```bicep
-param enableRecommendedMetricAlerts = false
-```
 
 Log-based Azure Monitor alert rules (`scheduledQueryRules`) are intentionally out of scope in this repo.
-Setting `enableFullPrometheusMetrics` additionally applies the [full metrics profile](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-default)
+This deployment applies the [full metrics profile](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-default)
 and pod-annotation scraping via [`ama-metrics-settings-configmap`](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-configuration).
 This means custom app metrics (e.g., `nginx_http_requests_total`) appear in both ADX **and** Managed Prometheus — a true dual-pipeline.
 
@@ -495,12 +489,10 @@ All parameters have sensible defaults. See `main.sample.bicepparam` for the full
 | `nodeVmSize` / `nodeCount` | `Standard_D4s_v3` / `2` | AKS node pool sizing |
 | `adxSkuName` / `adxSkuCapacity` | `Standard_E2ads_v5` / `2` | ADX cluster sizing |
 | `userPrincipalNames` | `[]` | UPN emails (e.g. `alias@tenant.onmicrosoft.com`) → ADX Viewer + Grafana Admin. Resolved via [Microsoft Graph extension](https://learn.microsoft.com/graph/templates/bicep/whats-new) |
-| `enableManagedPrometheus` | `true` | Deploy Managed Prometheus alongside adx-mon ([details](#managed-prometheus-enabled-by-default)) |
-| `enableRecommendedMetricAlerts` | `true` | Deploy Azure Monitor recommended AKS metric alerts and a simple custom alert demo rule ([details](#managed-prometheus-enabled-by-default)) |
+| `enableManagedPrometheus` | `true` | Deploy Managed Prometheus alongside adx-mon (includes full metrics profile + recommended alerts) ([details](#managed-prometheus-enabled-by-default)) |
 | `actionGroupName` | `ag-adx-mon` | Azure Monitor Action Group name used by alert rules |
 | `alertEmailReceivers` | _required_ | Email receivers attached to the Action Group used by alert rules |
 | `alertOwnerIds` | _required_ | Alert owner/contact identifiers used as metadata on custom demo alerts |
-| `enableFullPrometheusMetrics` | `true` | Full metrics profile + pod-annotation scraping ([details](#managed-prometheus-enabled-by-default)) |
 | `enableDiagnosticSettings` | `true` | Send AKS control-plane logs to Log Analytics ([details](#aks-diagnostic-settings-enabled-by-default)) |
 | `enableContainerInsights` | `true` | Collect container logs + K8s inventory via Container Insights ([details](#container-insights-enabled-by-default)) |
 | `dashboardDefinitions` | `[]` | Grafana dashboard JSON definitions to provision ([details](#grafana-dashboards)) |

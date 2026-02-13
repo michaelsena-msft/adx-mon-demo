@@ -25,9 +25,6 @@ param deployerIdentityId string
 @description('Set to any unique value to force the deployment script to re-execute. Leave empty for normal behavior.')
 param forceScriptRerun string = ''
 
-@description('Enable full Prometheus metrics profile and pod-annotation scraping')
-param enableFullPrometheusMetrics bool = false
-
 var crdsYaml = loadTextContent('../k8s/crds.yaml')
 var ingestorYaml = loadTextContent('../k8s/ingestor.yaml')
 var collectorYaml = loadTextContent('../k8s/collector.yaml')
@@ -67,7 +64,6 @@ resource applyK8sManifests 'Microsoft.Resources/deploymentScripts@2023-08-01' = 
       { name: 'ALERTRULE_YAML', value: alertruleYaml }
       { name: 'DEMOAPP_YAML', value: demoAppYaml }
       { name: 'AMA_METRICS_SETTINGS_YAML', value: amaMetricsSettingsYaml }
-      { name: 'ENABLE_FULL_PROMETHEUS', value: string(enableFullPrometheusMetrics) }
     ]
     scriptContent: '''
       set -e
@@ -109,10 +105,8 @@ resource applyK8sManifests 'Microsoft.Resources/deploymentScripts@2023-08-01' = 
       echo "=== Applying demo app ==="
       echo "$DEMOAPP_YAML" | kubectl apply -f -
 
-      if [ "$ENABLE_FULL_PROMETHEUS" = "True" ]; then
-        echo "=== Applying ama-metrics ConfigMap (full Prometheus profile + pod-annotation scraping) ==="
-        echo "$AMA_METRICS_SETTINGS_YAML" | kubectl apply -f -
-      fi
+      echo "=== Applying ama-metrics ConfigMap (full Prometheus profile + pod-annotation scraping) ==="
+      echo "$AMA_METRICS_SETTINGS_YAML" | kubectl apply -f -
 
       echo "=== Annotating CoreDNS for log capture ==="
       kubectl patch deployment coredns -n kube-system --type merge -p '{"spec":{"template":{"metadata":{"annotations":{"adx-mon/scrape":"true","adx-mon/port":"9153","adx-mon/path":"/metrics","adx-mon/log-destination":"Logs:CoreDNS","adx-mon/log-parsers":""}}}}}' || true

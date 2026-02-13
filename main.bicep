@@ -75,9 +75,6 @@ param forceScriptRerun string = ''
 @description('Enable Managed Prometheus for AKS metrics collection.')
 param enableManagedPrometheus bool = true
 
-@description('Enable Azure Monitor recommended AKS metric alerts.')
-param enableRecommendedMetricAlerts bool = true
-
 @description('Name of the Azure Monitor Action Group used by alert rules.')
 param actionGroupName string = 'ag-adx-mon'
 
@@ -86,9 +83,6 @@ param alertEmailReceivers AlertEmailReceiver[]
 
 @description('Alert owner/contact identifiers used as alert metadata (for example: aliases).')
 param alertOwnerIds string[]
-
-@description('Enable full Prometheus metrics profile and pod-annotation scraping.')
-param enableFullPrometheusMetrics bool = true
 
 @description('Enable AKS control-plane diagnostic settings (logs to Log Analytics).')
 param enableDiagnosticSettings bool = true
@@ -223,7 +217,7 @@ module prometheusRules 'modules/prometheus-rules.bicep' = if (enableManagedProme
 
 // ---------- Recommended Metric Alerts (optional, needs AKS and Managed Prometheus) ----------
 
-module actionGroup 'modules/action-group.bicep' = if (enableManagedPrometheus && enableRecommendedMetricAlerts) {
+module actionGroup 'modules/action-group.bicep' = if (enableManagedPrometheus) {
   scope: rg
   name: 'action-group-deployment'
   params: {
@@ -232,7 +226,7 @@ module actionGroup 'modules/action-group.bicep' = if (enableManagedPrometheus &&
   }
 }
 
-module recommendedMetricAlerts 'modules/recommended-metric-alerts.bicep' = if (enableManagedPrometheus && enableRecommendedMetricAlerts) {
+module recommendedMetricAlerts 'modules/recommended-metric-alerts.bicep' = if (enableManagedPrometheus) {
   scope: rg
   name: 'recommended-metric-alerts-deployment'
   params: {
@@ -249,7 +243,7 @@ module recommendedMetricAlerts 'modules/recommended-metric-alerts.bicep' = if (e
 
 // ---------- Simple Custom Prometheus Alert Demo ----------
 
-module simplePrometheusAlert 'modules/simple-prometheus-alert.bicep' = if (enableManagedPrometheus && enableRecommendedMetricAlerts) {
+module simplePrometheusAlert 'modules/simple-prometheus-alert.bicep' = if (enableManagedPrometheus) {
   scope: rg
   name: 'simple-prometheus-alert-deployment'
   params: {
@@ -357,7 +351,6 @@ module k8sWorkloads 'modules/k8s-workloads.bicep' = {
     region: location
     deployerIdentityId: identity.outputs.deployerIdentityId
     forceScriptRerun: forceScriptRerun
-    enableFullPrometheusMetrics: enableFullPrometheusMetrics
   }
 }
 
@@ -388,10 +381,10 @@ output grafanaEndpoint string = grafana.outputs.grafanaEndpoint
 output resourceGroupName string = rg.name
 output azureMonitorWorkspaceId string = enableManagedPrometheus ? azureMonitorWorkspaceResourceId : ''
 output logAnalyticsPortalUrl string = needsLaw ? 'https://portal.azure.com/#@${tenant().tenantId}/resource${logAnalyticsWorkspaceResourceId}/logs' : ''
-output recommendedMetricAlertRuleGroupNames array = (enableManagedPrometheus && enableRecommendedMetricAlerts) ? recommendedMetricAlertRuleGroupNameList : []
-output demoCustomAlertRuleGroupName string = (enableManagedPrometheus && enableRecommendedMetricAlerts) ? demoCustomAlertRuleGroupNameValue : ''
+output recommendedMetricAlertRuleGroupNames array = enableManagedPrometheus ? recommendedMetricAlertRuleGroupNameList : []
+output demoCustomAlertRuleGroupName string = enableManagedPrometheus ? demoCustomAlertRuleGroupNameValue : ''
 output alertLocation string = location
-output azureMonitorAlertPortalUrls array = (enableManagedPrometheus && enableRecommendedMetricAlerts) ? [
+output azureMonitorAlertPortalUrls array = enableManagedPrometheus ? [
   'https://portal.azure.com/#@${tenant().tenantId}/resource/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroupName}/providers/Microsoft.AlertsManagement/prometheusRuleGroups/KubernetesAlert-RecommendedMetricAlerts${aksClusterName}-Cluster-level/overview'
   'https://portal.azure.com/#@${tenant().tenantId}/resource/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroupName}/providers/Microsoft.AlertsManagement/prometheusRuleGroups/KubernetesAlert-RecommendedMetricAlerts${aksClusterName}-Node-level/overview'
   'https://portal.azure.com/#@${tenant().tenantId}/resource/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroupName}/providers/Microsoft.AlertsManagement/prometheusRuleGroups/KubernetesAlert-RecommendedMetricAlerts${aksClusterName}-Pod-level/overview'
