@@ -20,8 +20,14 @@ param resourceGroupName string = 'rg-adx-mon'
 @description('Azure region for all resources.')
 param location string = 'eastus2'
 
-@description('Name of the AKS managed cluster.')
+@description('Name of the AKS managed cluster (used for both new and existing clusters).')
 param aksClusterName string = 'aks-adx-mon'
+
+@description('When false, skip AKS creation and target an existing cluster in the same resource group.')
+param createAks bool = true
+
+@description('OIDC issuer URL of the existing AKS cluster (required when createAks is false).')
+param existingAksOidcIssuerUrl string = ''
 
 @description('Globally unique name for the ADX cluster (lowercase alphanumeric only).')
 @maxLength(22)
@@ -112,6 +118,7 @@ var defaultDashboards = [
 var allDashboards = concat(defaultDashboards, dashboardDefinitions)
 
 // Stable resource IDs (avoid conditional module output wiring).
+var aksResourceId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.ContainerService/managedClusters', aksClusterName)
 var azureMonitorWorkspaceResourceId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.Monitor/accounts', azureMonitorWorkspaceName)
 var managedPrometheusDataCollectionEndpointResourceId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.Insights/dataCollectionEndpoints', managedPrometheusDataCollectionEndpointName)
 var logAnalyticsWorkspaceResourceId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.OperationalInsights/workspaces', logAnalyticsWorkspaceName)
@@ -125,6 +132,10 @@ var recommendedMetricAlertRuleGroupNameList = [
 ]
 var demoCustomAlertRuleGroupNameValue = 'DemoCustomAlertsRuleGroup-${aksClusterName}'
 
+// Resolve AKS OIDC issuer URL from module output or param
+#disable-next-line BCP318
+var aksOidcIssuerUrl = createAks ? aks.outputs.oidcIssuerUrl : existingAksOidcIssuerUrl
+
 // ---------- Resource Group ----------
 
 resource rg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
@@ -132,9 +143,9 @@ resource rg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
   location: location
 }
 
-// ---------- AKS ----------
+// ---------- AKS (conditional — skipped when targeting an existing cluster) ----------
 
-module aks 'modules/aks.bicep' = {
+module aks 'modules/aks.bicep' = if (createAks) {
   scope: rg
   name: 'aks-deployment'
   params: {
@@ -167,8 +178,8 @@ module identity 'modules/identity.bicep' = {
     adxMonIdentityName: adxMonIdentityName
     deployerIdentityName: deployerIdentityName
     location: location
-    aksOidcIssuerUrl: aks.outputs.oidcIssuerUrl
-    aksClusterName: aks.outputs.aksName
+    aksOidcIssuerUrl: aksOidcIssuerUrl
+    aksClusterName: aksClusterName
   }
 }
 
@@ -190,7 +201,7 @@ module managedPrometheus 'modules/managed-prometheus.bicep' = if (enableManagedP
   name: 'managed-prometheus-deployment'
   params: {
     location: location
-    aksClusterName: aks.outputs.aksName
+    aksClusterName: aksClusterName
     azureMonitorWorkspaceName: azureMonitorWorkspaceName
     dataCollectionEndpointName: managedPrometheusDataCollectionEndpointName
     dataCollectionRuleName: managedPrometheusDataCollectionRuleName
@@ -207,7 +218,7 @@ module prometheusRules 'modules/prometheus-rules.bicep' = if (enableManagedProme
   params: {
     location: location
     azureMonitorWorkspaceId: azureMonitorWorkspaceResourceId
-    aksClusterId: aks.outputs.aksId
+    aksClusterId: aksResourceId
     aksClusterName: aksClusterName
   }
   dependsOn: [
@@ -231,7 +242,7 @@ module recommendedMetricAlerts 'modules/recommended-metric-alerts.bicep' = if (e
   name: 'recommended-metric-alerts-deployment'
   params: {
     location: location
-    aksClusterId: aks.outputs.aksId
+    aksClusterId: aksResourceId
     azureMonitorWorkspaceId: azureMonitorWorkspaceResourceId
     actionGroupResourceId: alertActionGroupResourceId
   }
@@ -248,7 +259,7 @@ module simplePrometheusAlert 'modules/simple-prometheus-alert.bicep' = if (enabl
   name: 'simple-prometheus-alert-deployment'
   params: {
     location: location
-    aksClusterId: aks.outputs.aksId
+    aksClusterId: aksResourceId
     aksClusterName: aksClusterName
     azureMonitorWorkspaceId: azureMonitorWorkspaceResourceId
     actionGroupResourceId: alertActionGroupResourceId
@@ -278,7 +289,7 @@ module diagnosticSettings 'modules/diagnostic-settings.bicep' = if (enableDiagno
   scope: rg
   name: 'diagnostic-settings-deployment'
   params: {
-    aksClusterName: aks.outputs.aksName
+    aksClusterName: aksClusterName
     logAnalyticsWorkspaceId: logAnalyticsWorkspaceResourceId
   }
   dependsOn: [
@@ -292,7 +303,7 @@ module containerInsightsWithManagedPrometheus 'modules/container-insights.bicep'
   scope: rg
   name: 'container-insights-deployment-mp'
   params: {
-    aksClusterName: aks.outputs.aksName
+    aksClusterName: aksClusterName
     location: location
     dataCollectionEndpointName: containerInsightsDataCollectionEndpointName
     dataCollectionRuleName: containerInsightsDataCollectionRuleName
@@ -310,7 +321,7 @@ module containerInsightsWithoutManagedPrometheus 'modules/container-insights.bic
   scope: rg
   name: 'container-insights-deployment'
   params: {
-    aksClusterName: aks.outputs.aksName
+    aksClusterName: aksClusterName
     location: location
     dataCollectionEndpointName: containerInsightsDataCollectionEndpointName
     dataCollectionRuleName: containerInsightsDataCollectionRuleName
@@ -344,7 +355,7 @@ module k8sWorkloads 'modules/k8s-workloads.bicep' = {
   name: 'k8s-workloads-deployment'
   params: {
     location: location
-    aksClusterName: aks.outputs.aksName
+    aksClusterName: aksClusterName
     adxUri: adx.outputs.adxUri
     adxMonClientId: identity.outputs.adxMonIdentityClientId
     clusterName: aksClusterName
@@ -373,7 +384,7 @@ module grafanaConfig 'modules/grafana-config.bicep' = {
 
 // ---------- Outputs ----------
 
-output aksClusterName string = aks.outputs.aksName
+output aksClusterName string = aksClusterName
 output adxClusterUri string = adx.outputs.adxUri
 output adxWebExplorerUrl string = 'https://dataexplorer.azure.com/clusters/${replace(adx.outputs.adxUri, 'https://', '')}/databases/Metrics'
 output adxLogsExplorerUrl string = 'https://dataexplorer.azure.com/clusters/${replace(adx.outputs.adxUri, 'https://', '')}/databases/Logs'

@@ -68,11 +68,12 @@ resource applyK8sManifests 'Microsoft.Resources/deploymentScripts@2023-08-01' = 
     scriptContent: '''
       set -e
 
-      echo "=== Installing kubectl ==="
+      echo "=== Installing kubectl + kubelogin ==="
       az aks install-cli 2>/dev/null || true
 
-      echo "=== Getting AKS credentials ==="
-      az aks get-credentials -n "$AKS_CLUSTER" -g "$AKS_RG" --overwrite-existing --admin
+      echo "=== Getting AKS credentials (AAD auth) ==="
+      az aks get-credentials -n "$AKS_CLUSTER" -g "$AKS_RG" --overwrite-existing
+      kubelogin convert-kubeconfig -l azurecli
 
       echo "=== Applying CRDs ==="
       echo "$CRDS_YAML" | kubectl apply -f -
