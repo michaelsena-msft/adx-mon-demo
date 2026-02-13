@@ -1,5 +1,10 @@
 // Configures Grafana with ADX datasource and optional dashboards
 
+type DashboardDefinition = {
+  title: string
+  definition: object
+}
+
 @description('Azure region for the deployment script resource.')
 param location string
 
@@ -21,8 +26,8 @@ param deployerPrincipalId string
 @description('Set to any unique value to force the deployment script to re-execute. Leave empty for normal behavior.')
 param forceScriptRerun string = ''
 
-@description('Dashboard definitions to provision. Each entry has a title and a JSON model string.')
-param dashboardDefinitions array = []
+@description('Dashboard definitions to provision. Each entry has a title and a JSON model object.')
+param dashboardDefinitions DashboardDefinition[] = []
 
 resource grafana 'Microsoft.Dashboard/grafana@2024-10-01' existing = {
   name: grafanaName

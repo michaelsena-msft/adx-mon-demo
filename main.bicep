@@ -2,6 +2,11 @@ targetScope = 'subscription'
 
 extension microsoftGraphV1
 
+type DashboardDefinition = {
+  title: string
+  definition: object
+}
+
 // ---------- Parameters ----------
 
 @description('Name of the resource group.')
@@ -84,7 +89,7 @@ param enableDiagnosticSettings bool = true
 param enableContainerInsights bool = true
 
 @description('Grafana dashboard definitions to provision. Each entry needs a title and a definition (JSON model object).')
-param dashboardDefinitions array = []
+param dashboardDefinitions DashboardDefinition[] = []
 
 // ---------- Resolve UPN emails → object IDs via Microsoft Graph ----------
 
