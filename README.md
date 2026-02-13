@@ -179,6 +179,15 @@ kubectl run -it --rm loadgen --image=curlimages/curl --restart=Never -- \
   sh -c 'for i in $(seq 1 100); do curl -s http://demo-app/ > /dev/null; done; echo Done'
 ```
 
+Need steady background traffic without a redeploy? Apply the optional traffic generator:
+
+```bash
+kubectl apply -f k8s/demo-app-trafficgen.yaml
+
+# Stop it later
+kubectl delete -f k8s/demo-app-trafficgen.yaml
+```
+
 Open the Grafana dashboard (`grafanaEndpoint` output) to see request rate, CPU, and memory
 respond in real time — side-by-side in ADX and Managed Prometheus.
 
@@ -412,6 +421,7 @@ Geneva agent deployment uses Kubernetes manifests (Helm/YAML), not Bicep. See th
     ├── collector.yaml            # Collector DaemonSet + Singleton
     ├── ksm.yaml                  # kube-state-metrics (auto-sharded)
     ├── demo-app.yaml             # nginx + exporter sidecar with dual-pipeline annotations
+    ├── demo-app-trafficgen.yaml  # Optional semi-random traffic generator for demo-app
     ├── ama-metrics-settings.yaml # ConfigMap for Managed Prometheus scrape settings
     ├── functions.yaml            # Sample Function + ManagementCommand CRs
     └── sample-alertrule.yaml     # Sample AlertRule for pod restart detection

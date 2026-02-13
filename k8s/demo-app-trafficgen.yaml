@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-app-trafficgen
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo-app-trafficgen
+  template:
+    metadata:
+      labels:
+        app: demo-app-trafficgen
+    spec:
+      containers:
+        - name: trafficgen
+          image: curlimages/curl:8.12.1
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              echo "Starting demo-app traffic generator"
+              while true; do
+                BURST=$((1 + $(date +%s) % 5))
+                i=0
+                while [ "$i" -lt "$BURST" ]; do
+                  curl -fsS --max-time 5 http://demo-app/ >/dev/null || true
+                  i=$((i + 1))
+                done
+                sleep $((3 + $(date +%s) % 18))
+              done
+          resources:
+            requests:
+              cpu: 5m
+              memory: 16Mi
+            limits:
+              cpu: 25m
+              memory: 32Mi
