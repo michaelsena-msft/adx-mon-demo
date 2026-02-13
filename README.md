@@ -67,7 +67,7 @@ Use **ADX/Kusto pathway** when describing the ADX data path. Use **adx-mon** for
 
 ## Bicep Module Graph
 
-`main.bicep` orchestrates 12 resource-group-scoped modules. **Solid lines** = always deployed.
+`main.bicep` orchestrates the resource-group-scoped modules below. **Solid lines** = always deployed.
 **Dashed lines** = conditionally deployed (enabled by default, can be disabled).
 AKS, ADX, and Grafana deploy in parallel; downstream modules wait for their dependencies.
 
@@ -78,16 +78,8 @@ flowchart TD
     main --> aks["aks.bicep\nAKS + ACNS"]
     main --> adx["adx.bicep\nADX + Databases"]
     main --> grafana["grafana.bicep\nManaged Grafana"]
-    main -.-> law["log-analytics.bicep\nLog Analytics"]
 
     aks --> identity["identity.bicep\nManaged Identities"]
-
-    aks & grafana -.-> mp["managed-prometheus.bicep\nAMW + DCE/DCR/DCRA"]
-    mp & aks -.-> rules["prometheus-rules.bicep\n48 Recording Rules"]
-
-    law & aks -.-> diag["diagnostic-settings.bicep\nControl-Plane Logs"]
-    law & aks & grafana -.-> ci["container-insights.bicep\nContainer Logs"]
-    mp -.->|shares DCE| ci
 
     adx & identity & grafana --> roles["role-assignments.bicep\nADX + Grafana RBAC"]
 
@@ -95,8 +87,24 @@ flowchart TD
 
     grafana & adx & identity --> gconfig["grafana-config.bicep\nDatasources + Dashboards"]
 
+    %% Managed Prometheus + alerts (optional)
+    main -.-> mp["managed-prometheus.bicep\nAMW + DCE/DCR/DCRA"]
+    mp & aks -.-> rules["prometheus-rules.bicep\nRecording rules"]
+    main -.-> ag["action-group.bicep\nAction Group"]
+    mp & aks & ag -.-> recAlerts["recommended-metric-alerts.bicep\nRecommended alerts"]
+    mp & aks & ag -.-> demoAlert["simple-prometheus-alert.bicep\nDemo Prometheus alert"]
+
+    %% Logs (optional)
+    main -.-> law["log-analytics.bicep\nLog Analytics"]
+    law & aks -.-> diag["diagnostic-settings.bicep\nControl-plane logs"]
+    law & aks & grafana -.-> ci["container-insights.bicep\nContainer logs + inventory"]
+    mp -.->|shares DCE| ci
+
     style mp fill:#f0e6ff,stroke:#7b2ff7,stroke-dasharray: 5 5
     style rules fill:#f0e6ff,stroke:#7b2ff7,stroke-dasharray: 5 5
+    style ag fill:#f0e6ff,stroke:#7b2ff7,stroke-dasharray: 5 5
+    style recAlerts fill:#f0e6ff,stroke:#7b2ff7,stroke-dasharray: 5 5
+    style demoAlert fill:#f0e6ff,stroke:#7b2ff7,stroke-dasharray: 5 5
     style law fill:#e8f0fe,stroke:#1a73e8,stroke-dasharray: 5 5
     style diag fill:#e8f0fe,stroke:#1a73e8,stroke-dasharray: 5 5
     style ci fill:#e8f0fe,stroke:#1a73e8,stroke-dasharray: 5 5
@@ -348,6 +356,24 @@ Log-based Azure Monitor alert rules (`scheduledQueryRules`) are intentionally ou
 This deployment applies the [full metrics profile](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-default)
 and pod-annotation scraping via [`ama-metrics-settings-configmap`](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-configuration).
 This means custom app metrics (e.g., `nginx_http_requests_total`) appear in both ADX **and** Managed Prometheus — a true dual-pipeline.
+
+### Control plane metrics (preview)
+
+AKS control plane metrics (for example `controlplane-apiserver` / `controlplane-etcd`) are a **preview** feature for the managed service for Prometheus.
+Follow the official guide: [Monitor Azure Kubernetes Service control plane metrics (preview)](https://learn.microsoft.com/azure/aks/control-plane-metrics-monitor).
+
+At a high level, you must:
+
+```azurecli
+# Install the aks-preview extension
+az extension add --name aks-preview
+
+# Register the feature flag
+az feature register --namespace "Microsoft.ContainerService" --name "AzureMonitorMetricsControlPlanePreview"
+
+# After it shows as Registered, refresh the provider registration
+az provider register --namespace "Microsoft.ContainerService"
+```
 
 See [COMPARISONS.md](COMPARISONS.md) for a detailed coverage comparison.
 

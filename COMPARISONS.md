@@ -11,7 +11,7 @@ A side-by-side comparison for teams choosing between [adx-mon](https://github.co
 ```mermaid
 graph LR
     subgraph AKS["AKS Cluster"]
-        Sources["kubelet · cAdvisor · KSM · apiserver · Pods"]
+        Sources["kubelet · cAdvisor · KSM · CoreDNS · apiserver · Pods"]
         ADXMon["adx-mon<br/>(Collector + Ingestor)"]
         AMA["ama-metrics<br/>(Managed Prometheus)"]
         AMALogs["ama-logs<br/>(Container Insights)"]
@@ -51,9 +51,10 @@ Where both systems collect the same metric, the underlying data is identical —
 | **Container network / filesystem** | ✅ cAdvisor | ✅ cAdvisor | Same metrics |
 | **Kubelet health** | ✅ kubelet `/metrics/resource` | ✅ kubelet | Volume stats, runtime ops, pod start latency |
 | **Kubernetes object state** | ✅ [KSM](https://github.com/kubernetes/kube-state-metrics) (deployed) | ✅ KSM (deployed) | Pod phase, deployment replicas, node conditions, etc. |
+| **CoreDNS** | ✅ (patched via annotations) | ✅ CoreDNS | DNS metrics like `coredns_dns_requests_total`. This repo enables CoreDNS scraping in `ama-metrics-settings-configmap`. |
 | **kube-apiserver** | ✅ Collector Singleton | ⚠️ [Preview](https://learn.microsoft.com/en-us/azure/aks/control-plane-metrics-monitor) | adx-mon scrapes directly; MP requires enabling Control Plane Metrics (preview) |
 | **Node-level (disk, load, network)** | ❌ Not collected | ✅ [node-exporter](https://github.com/prometheus/node_exporter) | Biggest gap — adx-mon lacks `node_load*`, `node_disk_*`, `node_filesystem_*`. Mitigated by deploying node-exporter with `adx-mon/scrape: "true"` ([details](README.md#metrics-pod-annotations)) |
-| **Application metrics** | ✅ Pod annotations | ✅ Pod annotations (enabled by default via [`enableFullPrometheusMetrics`](README.md#managed-prometheus-enabled-by-default)) | adx-mon: annotate pods. MP: same annotations scraped automatically |
+| **Application metrics** | ✅ Pod annotations | ✅ Pod annotations (enabled by default) | adx-mon: annotate pods. MP: same annotations scraped automatically |
 
 ---
 
