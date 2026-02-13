@@ -5,13 +5,13 @@ param location string
 param aksClusterName string
 
 @description('Name of the Azure Monitor Workspace.')
-param azureMonitorWorkspaceName string = 'amw-adx-mon'
+param azureMonitorWorkspaceName string
 
 @description('Name of the Data Collection Endpoint.')
-param dataCollectionEndpointName string = 'dce-adx-mon'
+param dataCollectionEndpointName string
 
 @description('Name of the Data Collection Rule for Prometheus.')
-param dataCollectionRuleName string = 'dcr-adx-mon-prometheus'
+param dataCollectionRuleName string
 
 @description('Principal ID of the Grafana managed identity to grant Monitoring Reader.')
 param grafanaPrincipalId string

@@ -14,10 +14,10 @@ param grafanaPrincipalId string
 param existingDataCollectionEndpointId string = ''
 
 @description('Name of the Data Collection Endpoint for Container Insights (used only when no existing DCE is provided).')
-param dataCollectionEndpointName string = 'dce-adx-mon-ci'
+param dataCollectionEndpointName string
 
 @description('Name of the Data Collection Rule for Container Insights.')
-param dataCollectionRuleName string = 'dcr-adx-mon-ci'
+param dataCollectionRuleName string
 
 var monitoringReaderRoleId = '43d0d8ad-25c7-4714-9337-8ba259a9fe05'
 var createDce = empty(existingDataCollectionEndpointId)

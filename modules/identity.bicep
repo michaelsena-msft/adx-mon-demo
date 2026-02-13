@@ -1,8 +1,8 @@
 @description('Name of the adx-mon workload identity.')
-param adxMonIdentityName string = 'id-adx-mon'
+param adxMonIdentityName string
 
 @description('Name of the deployer managed identity for deployment scripts.')
-param deployerIdentityName string = 'id-adx-mon-deployer'
+param deployerIdentityName string
 
 @description('Azure region for all resources.')
 param location string

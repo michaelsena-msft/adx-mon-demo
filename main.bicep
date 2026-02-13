@@ -20,6 +20,30 @@ param adxClusterName string = 'adxmon${uniqueString(subscription().id)}'
 @description('Name of the Grafana workspace.')
 param grafanaName string = 'grafana-adx-mon'
 
+@description('Name of the adx-mon workload identity.')
+param adxMonIdentityName string = 'id-adx-mon'
+
+@description('Name of the deployer managed identity for deployment scripts.')
+param deployerIdentityName string = 'id-adx-mon-deployer'
+
+@description('Name of the Log Analytics workspace.')
+param logAnalyticsWorkspaceName string = 'law-adx-mon'
+
+@description('Name of the Azure Monitor Workspace (Managed Prometheus).')
+param azureMonitorWorkspaceName string = 'amw-adx-mon'
+
+@description('Name of the Data Collection Endpoint (Managed Prometheus).')
+param managedPrometheusDataCollectionEndpointName string = 'dce-adx-mon'
+
+@description('Name of the Data Collection Rule for Prometheus metrics.')
+param managedPrometheusDataCollectionRuleName string = 'dcr-adx-mon-prometheus'
+
+@description('Name of the Data Collection Endpoint (Container Insights).')
+param containerInsightsDataCollectionEndpointName string = 'dce-adx-mon-ci'
+
+@description('Name of the Data Collection Rule (Container Insights).')
+param containerInsightsDataCollectionRuleName string = 'dcr-adx-mon-ci'
+
 @description('VM size for the AKS system node pool.')
 param nodeVmSize string = 'Standard_D4s_v3'
 
@@ -119,6 +143,8 @@ module identity 'modules/identity.bicep' = {
   scope: rg
   name: 'identity-deployment'
   params: {
+    adxMonIdentityName: adxMonIdentityName
+    deployerIdentityName: deployerIdentityName
     location: location
     aksOidcIssuerUrl: aks.outputs.oidcIssuerUrl
     aksClusterName: aks.outputs.aksName
@@ -144,6 +170,9 @@ module managedPrometheus 'modules/managed-prometheus.bicep' = if (enableManagedP
   params: {
     location: location
     aksClusterName: aks.outputs.aksName
+    azureMonitorWorkspaceName: azureMonitorWorkspaceName
+    dataCollectionEndpointName: managedPrometheusDataCollectionEndpointName
+    dataCollectionRuleName: managedPrometheusDataCollectionRuleName
     grafanaPrincipalId: grafana.outputs.grafanaPrincipalId
     grafanaName: grafana.outputs.grafanaName
   }
@@ -205,6 +234,7 @@ module logAnalytics 'modules/log-analytics.bicep' = if (needsLaw) {
   name: 'log-analytics-deployment'
   params: {
     location: location
+    workspaceName: logAnalyticsWorkspaceName
   }
 }
 
@@ -228,6 +258,8 @@ module containerInsights 'modules/container-insights.bicep' = if (enableContaine
   params: {
     aksClusterName: aks.outputs.aksName
     location: location
+    dataCollectionEndpointName: containerInsightsDataCollectionEndpointName
+    dataCollectionRuleName: containerInsightsDataCollectionRuleName
     #disable-next-line BCP321 BCP318
     logAnalyticsWorkspaceId: needsLaw ? logAnalytics.outputs.workspaceId : ''
     grafanaPrincipalId: grafana.outputs.grafanaPrincipalId

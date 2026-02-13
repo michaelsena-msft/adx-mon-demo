@@ -1,5 +1,5 @@
 @description('Name of the Log Analytics workspace.')
-param workspaceName string = 'law-adx-mon'
+param workspaceName string
 
 @description('Azure region for the workspace.')
 param location string
