@@ -117,7 +117,7 @@ cp main.sample.bicepparam main.bicepparam
 
 Edit `main.bicepparam`:
 - add your user UPN(s) for **ADX Viewer + Grafana Admin**
-- set an existing **Action Group resource ID** for Azure Monitor alerts
+- set one or more **alert email receivers** for Azure Monitor alerts (Action Group is created by this deployment)
 - set one or more **alert owner/contact identifiers**
 
 ```bicep
@@ -125,7 +125,12 @@ param userPrincipalNames = [
   'yourname@yourtenant.onmicrosoft.com'
 ]
 
-param actionGroupResourceId = '/subscriptions/<sub-id>/resourceGroups/<rg-name>/providers/microsoft.insights/actionGroups/<action-group-name>'
+param alertEmailReceivers = [
+  {
+    name: 'primary'
+    emailAddress: 'yourname@yourtenant.onmicrosoft.com'
+  }
+]
 
 param alertOwnerIds = [
   'youralias'
@@ -461,6 +466,7 @@ Geneva agent deployment uses Kubernetes manifests (Helm/YAML), not Bicep. See th
 │   ├── grafana-config.bicep      # Deployment script: ADX datasource + dashboards
 │   ├── managed-prometheus.bicep  # AMW, DCE, DCR, DCRA, Grafana link (can be disabled)
 │   ├── prometheus-rules.bicep    # Prometheus recording rules for Kubernetes dashboards
+│   ├── action-group.bicep         # Azure Monitor Action Group (email receivers)
 │   ├── recommended-metric-alerts.bicep # Azure Monitor recommended AKS metric alerts (OOTB)
 │   ├── simple-prometheus-alert.bicep   # Simple custom Prometheus alert demo rule
 │   ├── diagnostic-settings.bicep # AKS control-plane logs to LAW (can be disabled)
@@ -491,7 +497,8 @@ All parameters have sensible defaults. See `main.sample.bicepparam` for the full
 | `userPrincipalNames` | `[]` | UPN emails (e.g. `alias@tenant.onmicrosoft.com`) → ADX Viewer + Grafana Admin. Resolved via [Microsoft Graph extension](https://learn.microsoft.com/graph/templates/bicep/whats-new) |
 | `enableManagedPrometheus` | `true` | Deploy Managed Prometheus alongside adx-mon ([details](#managed-prometheus-enabled-by-default)) |
 | `enableRecommendedMetricAlerts` | `true` | Deploy Azure Monitor recommended AKS metric alerts and a simple custom alert demo rule ([details](#managed-prometheus-enabled-by-default)) |
-| `actionGroupResourceId` | _required_ | Existing Azure Monitor Action Group resource ID used by alert rules |
+| `actionGroupName` | `ag-adx-mon` | Azure Monitor Action Group name used by alert rules |
+| `alertEmailReceivers` | _required_ | Email receivers attached to the Action Group used by alert rules |
 | `alertOwnerIds` | _required_ | Alert owner/contact identifiers used as metadata on custom demo alerts |
 | `enableFullPrometheusMetrics` | `true` | Full metrics profile + pod-annotation scraping ([details](#managed-prometheus-enabled-by-default)) |
 | `enableDiagnosticSettings` | `true` | Send AKS control-plane logs to Log Analytics ([details](#aks-diagnostic-settings-enabled-by-default)) |

@@ -7,6 +7,11 @@ type DashboardDefinition = {
   definition: object
 }
 
+type AlertEmailReceiver = {
+  name: string
+  emailAddress: string
+}
+
 // ---------- Parameters ----------
 
 @description('Name of the resource group.')
@@ -73,8 +78,11 @@ param enableManagedPrometheus bool = true
 @description('Enable Azure Monitor recommended AKS metric alerts.')
 param enableRecommendedMetricAlerts bool = true
 
-@description('Resource ID of the Azure Monitor Action Group used by alert rules.')
-param actionGroupResourceId string
+@description('Name of the Azure Monitor Action Group used by alert rules.')
+param actionGroupName string = 'ag-adx-mon'
+
+@description('Email receivers for the Action Group used by alert rules.')
+param alertEmailReceivers AlertEmailReceiver[]
 
 @description('Alert owner/contact identifiers used as alert metadata (for example: aliases).')
 param alertOwnerIds string[]
@@ -199,6 +207,15 @@ module prometheusRules 'modules/prometheus-rules.bicep' = if (enableManagedProme
 
 // ---------- Recommended Metric Alerts (optional, needs AKS and Managed Prometheus) ----------
 
+module actionGroup 'modules/action-group.bicep' = if (enableManagedPrometheus && enableRecommendedMetricAlerts) {
+  scope: rg
+  name: 'action-group-deployment'
+  params: {
+    actionGroupName: actionGroupName
+    emailReceivers: alertEmailReceivers
+  }
+}
+
 module recommendedMetricAlerts 'modules/recommended-metric-alerts.bicep' = if (enableManagedPrometheus && enableRecommendedMetricAlerts) {
   scope: rg
   name: 'recommended-metric-alerts-deployment'
@@ -207,7 +224,8 @@ module recommendedMetricAlerts 'modules/recommended-metric-alerts.bicep' = if (e
     aksClusterId: aks.outputs.aksId
     #disable-next-line BCP318
     azureMonitorWorkspaceId: managedPrometheus.outputs.azureMonitorWorkspaceId
-    actionGroupResourceId: actionGroupResourceId
+    #disable-next-line BCP318
+    actionGroupResourceId: actionGroup.outputs.actionGroupResourceId
   }
 }
 
@@ -222,7 +240,8 @@ module simplePrometheusAlert 'modules/simple-prometheus-alert.bicep' = if (enabl
     aksClusterName: aksClusterName
     #disable-next-line BCP318
     azureMonitorWorkspaceId: managedPrometheus.outputs.azureMonitorWorkspaceId
-    actionGroupResourceId: actionGroupResourceId
+    #disable-next-line BCP318
+    actionGroupResourceId: actionGroup.outputs.actionGroupResourceId
     alertOwnerIds: alertOwnerIds
   }
   dependsOn: [

@@ -10,8 +10,16 @@ param userPrincipalNames = [
   'yourname@yourtenant.onmicrosoft.com'
 ]
 
-// Required: Existing Action Group resource ID for Azure Monitor metric alerts.
-param actionGroupResourceId = '/subscriptions/<sub-id>/resourceGroups/<rg-name>/providers/microsoft.insights/actionGroups/<action-group-name>'
+// Required: Email receivers for Azure Monitor alert notifications (Action Group is created by this deployment).
+param alertEmailReceivers = [
+  {
+    name: 'primary'
+    emailAddress: 'yourname@yourtenant.onmicrosoft.com'
+  }
+]
+
+// Optional: override Action Group name (default: ag-adx-mon)
+// param actionGroupName = 'ag-my-adxmon'
 
 // Required: Alert owner/contact identifiers (aliases or IDs) used in alert metadata.
 param alertOwnerIds = [
