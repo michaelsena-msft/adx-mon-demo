@@ -35,8 +35,8 @@ param adxSkuCapacity int = 2
 @description('User principal names (UPN emails) to grant ADX Viewer and Grafana Admin access. For TME tenant, use alias@tme01.onmicrosoft.com.')
 param userPrincipalNames string[] = []
 
-@description('Force update tag for deployment scripts and Kusto scripts.')
-param deployTimestamp string = utcNow()
+@description('Set to any unique value (e.g. a timestamp) to force deployment scripts to re-execute. Leave empty for normal behavior — scripts only rerun when their inputs change.')
+param forceScriptRerun string = ''
 
 @description('Enable Managed Prometheus for AKS metrics collection.')
 param enableManagedPrometheus bool = true
@@ -263,7 +263,7 @@ module k8sWorkloads 'modules/k8s-workloads.bicep' = {
     clusterName: aksClusterName
     region: location
     deployerIdentityId: identity.outputs.deployerIdentityId
-    forceUpdateTag: deployTimestamp
+    forceScriptRerun: forceScriptRerun
     enableFullPrometheusMetrics: enableFullPrometheusMetrics
   }
 }
@@ -280,7 +280,7 @@ module grafanaConfig 'modules/grafana-config.bicep' = {
     adxClusterName: adx.outputs.adxName
     deployerIdentityId: identity.outputs.deployerIdentityId
     deployerPrincipalId: identity.outputs.deployerPrincipalId
-    forceUpdateTag: deployTimestamp
+    forceScriptRerun: forceScriptRerun
     dashboardDefinitions: allDashboards
   }
 }
@@ -301,3 +301,12 @@ output logAnalyticsPortalUrl string = needsLaw ? 'https://portal.azure.com/#@${t
 output recommendedMetricAlertRuleGroupNames array = (enableManagedPrometheus && enableRecommendedMetricAlerts) ? recommendedMetricAlerts.outputs.recommendedAlertRuleGroupNames : []
 #disable-next-line BCP318
 output demoCustomAlertRuleGroupName string = (enableManagedPrometheus && enableRecommendedMetricAlerts) ? simplePrometheusAlert.outputs.customAlertRuleGroupName : ''
+output alertLocation string = location
+output azureMonitorAlertPortalUrls array = (enableManagedPrometheus && enableRecommendedMetricAlerts) ? [
+  'https://portal.azure.com/#@${tenant().tenantId}/resource/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroupName}/providers/Microsoft.AlertsManagement/prometheusRuleGroups/KubernetesAlert-RecommendedMetricAlerts${aksClusterName}-Cluster-level/overview'
+  'https://portal.azure.com/#@${tenant().tenantId}/resource/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroupName}/providers/Microsoft.AlertsManagement/prometheusRuleGroups/KubernetesAlert-RecommendedMetricAlerts${aksClusterName}-Node-level/overview'
+  'https://portal.azure.com/#@${tenant().tenantId}/resource/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroupName}/providers/Microsoft.AlertsManagement/prometheusRuleGroups/KubernetesAlert-RecommendedMetricAlerts${aksClusterName}-Pod-level/overview'
+  'https://portal.azure.com/#@${tenant().tenantId}/resource/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroupName}/providers/Microsoft.AlertsManagement/prometheusRuleGroups/DemoCustomAlertsRuleGroup-${aksClusterName}/overview'
+] : []
+output adxMonSampleAlertRuleFile string = 'k8s/sample-alertrule.yaml'
+output adxMonSampleAlertKubectlCommand string = 'kubectl -n adx-mon get alertrule pod-restart-alert -o yaml'

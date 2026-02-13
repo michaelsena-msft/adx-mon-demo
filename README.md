@@ -147,9 +147,34 @@ az deployment sub create \
 ```
 
 Deployment takes **~15 minutes** on a fresh deploy (ADX cluster provisioning is the bottleneck).
-Update deploys (re-runs with parameter changes) take **~9 minutes**.
+Update deploys (no-change or parameter-only changes) take **~4–5 minutes** — deployment scripts
+are skipped automatically when their inputs haven't changed.
 
 > **Tip**: Add `--no-wait` to return immediately and monitor via `az deployment sub show --name adxmon-deploy`.
+
+> **Force script re-execution**: If you need to reconcile out-of-band drift (e.g. someone manually
+> edited K8s resources or Grafana dashboards), force both deployment scripts to re-run:
+>
+> ```bash
+> az deployment sub create \
+>   --location eastus2 \
+>   --template-file main.bicep \
+>   --parameters main.bicepparam \
+>   --parameters forceScriptRerun=$(date -u +%Y%m%dT%H%M%SZ) \
+>   --name adxmon-deploy
+> ```
+
+> **Faster iterative deploys** (Azure CLI 2.76+): Skip full RBAC preflight validation with
+> `--validation-level ProviderNoRbac` to save a few seconds per deployment:
+>
+> ```bash
+> az deployment sub create \
+>   --location eastus2 \
+>   --template-file main.bicep \
+>   --parameters main.bicepparam \
+>   --validation-level ProviderNoRbac \
+>   --name adxmon-deploy
+> ```
 
 ### 3. Verify
 
@@ -171,6 +196,10 @@ This returns:
 | `logAnalyticsPortalUrl` | Log Analytics query portal (present when Diagnostic Settings or Container Insights is enabled) |
 | `recommendedMetricAlertRuleGroupNames` | Azure Monitor recommended AKS alert rule group names (when enabled) |
 | `demoCustomAlertRuleGroupName` | Name of the simple custom Prometheus alert demo rule group |
+| `alertLocation` | Azure region where alert rule groups are deployed |
+| `azureMonitorAlertPortalUrls` | Direct Azure portal URLs for all Azure Monitor Prometheus alert rule groups |
+| `adxMonSampleAlertRuleFile` | Repo path to the sample adx-mon AlertRule YAML |
+| `adxMonSampleAlertKubectlCommand` | Command to inspect the deployed sample adx-mon AlertRule in AKS |
 
 ### 4. Try It
 
@@ -468,6 +497,7 @@ All parameters have sensible defaults. See `main.sample.bicepparam` for the full
 | `enableDiagnosticSettings` | `true` | Send AKS control-plane logs to Log Analytics ([details](#aks-diagnostic-settings-enabled-by-default)) |
 | `enableContainerInsights` | `true` | Collect container logs + K8s inventory via Container Insights ([details](#container-insights-enabled-by-default)) |
 | `dashboardDefinitions` | `[]` | Grafana dashboard JSON definitions to provision ([details](#grafana-dashboards)) |
+| `forceScriptRerun` | `''` | Set to any unique value (e.g. a timestamp) to force deployment scripts to re-execute. Leave empty for normal idempotent behavior |
 
 ## Further Reading
 

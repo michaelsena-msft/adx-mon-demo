@@ -18,8 +18,8 @@ param deployerIdentityId string
 @description('Principal ID of the deployer managed identity.')
 param deployerPrincipalId string
 
-@description('Force re-run of the deployment script.')
-param forceUpdateTag string = utcNow()
+@description('Set to any unique value to force the deployment script to re-execute. Leave empty for normal behavior.')
+param forceScriptRerun string = ''
 
 @description('Dashboard definitions to provision. Each entry has a title and a JSON model string.')
 param dashboardDefinitions array = []
@@ -56,7 +56,7 @@ resource configScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
     azCliVersion: '2.63.0'
     retentionInterval: 'PT1H'
     timeout: 'PT15M'
-    forceUpdateTag: forceUpdateTag
+    forceUpdateTag: forceScriptRerun != '' ? forceScriptRerun : 'stable'
     environmentVariables: [
       { name: 'GRAFANA_NAME', value: grafanaName }
       { name: 'GRAFANA_RG', value: resourceGroup().name }
@@ -68,10 +68,20 @@ resource configScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
       set -e
       az extension add --name amg -y 2>/dev/null || true
 
-      echo "Waiting 60s for role propagation..."
-      sleep 60
+      # Retry-based RBAC propagation check (replaces fixed sleep 60)
+      MAX_RETRIES=12
+      RETRY_INTERVAL=10
+      EXISTING_UID=""
+      for i in $(seq 1 $MAX_RETRIES); do
+        EXISTING_UID=$(az grafana data-source show -n "$GRAFANA_NAME" -g "$GRAFANA_RG" --data-source "$ADX_NAME" --query uid -o tsv 2>/dev/null) && break
+        EXIT_CODE=$?
+        if [ $EXIT_CODE -eq 3 ]; then
+          break  # datasource not found but API is accessible — proceed to create
+        fi
+        echo "Waiting for Grafana RBAC propagation... (attempt $i/$MAX_RETRIES)"
+        sleep $RETRY_INTERVAL
+      done
 
-      EXISTING_UID=$(az grafana data-source show -n "$GRAFANA_NAME" -g "$GRAFANA_RG" --data-source "$ADX_NAME" --query uid -o tsv 2>/dev/null || true)
       if [ -n "$EXISTING_UID" ]; then
         echo "ADX datasource already exists (uid=$EXISTING_UID), updating..."
         az grafana data-source update -n "$GRAFANA_NAME" -g "$GRAFANA_RG" --data-source "$EXISTING_UID" --definition '{

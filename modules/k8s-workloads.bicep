@@ -22,8 +22,8 @@ param region string
 @description('Resource ID of the deployer managed identity for the deployment script')
 param deployerIdentityId string
 
-@description('Force re-run of the deployment script')
-param forceUpdateTag string = utcNow()
+@description('Set to any unique value to force the deployment script to re-execute. Leave empty for normal behavior.')
+param forceScriptRerun string = ''
 
 @description('Enable full Prometheus metrics profile and pod-annotation scraping')
 param enableFullPrometheusMetrics bool = false
@@ -51,7 +51,7 @@ resource applyK8sManifests 'Microsoft.Resources/deploymentScripts@2023-08-01' = 
     azCliVersion: '2.63.0'
     retentionInterval: 'PT1H'
     timeout: 'PT30M'
-    forceUpdateTag: forceUpdateTag
+    forceUpdateTag: forceScriptRerun != '' ? forceScriptRerun : 'stable'
     environmentVariables: [
       { name: 'AKS_CLUSTER', value: aksClusterName }
       { name: 'AKS_RG', value: resourceGroup().name }
@@ -82,7 +82,10 @@ resource applyK8sManifests 'Microsoft.Resources/deploymentScripts@2023-08-01' = 
       echo "$CRDS_YAML" | kubectl apply -f -
 
       echo "=== Waiting for CRDs to be established ==="
-      sleep 5
+      kubectl wait --for condition=established --timeout=60s \
+        crd/functions.adx-mon.azure.com \
+        crd/alertrules.adx-mon.azure.com \
+        crd/managementcommands.adx-mon.azure.com
 
       echo "=== Creating namespaces ==="
       kubectl create namespace adx-mon --dry-run=client -o yaml | kubectl apply -f -
