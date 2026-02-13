@@ -117,6 +117,20 @@ var defaultDashboards = [
 // Combine default dashboards with user-provided ones
 var allDashboards = concat(defaultDashboards, dashboardDefinitions)
 
+// Stable resource IDs (avoid conditional module output wiring).
+var azureMonitorWorkspaceResourceId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.Monitor/accounts', azureMonitorWorkspaceName)
+var managedPrometheusDataCollectionEndpointResourceId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.Insights/dataCollectionEndpoints', managedPrometheusDataCollectionEndpointName)
+var logAnalyticsWorkspaceResourceId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.OperationalInsights/workspaces', logAnalyticsWorkspaceName)
+var alertActionGroupResourceId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.Insights/actionGroups', actionGroupName)
+
+var recommendedAlertRuleGroupPrefix = 'KubernetesAlert-RecommendedMetricAlerts${aksClusterName}'
+var recommendedMetricAlertRuleGroupNameList = [
+  '${recommendedAlertRuleGroupPrefix}-Cluster-level'
+  '${recommendedAlertRuleGroupPrefix}-Node-level'
+  '${recommendedAlertRuleGroupPrefix}-Pod-level'
+]
+var demoCustomAlertRuleGroupNameValue = 'DemoCustomAlertsRuleGroup-${aksClusterName}'
+
 // ---------- Resource Group ----------
 
 resource rg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
@@ -198,11 +212,13 @@ module prometheusRules 'modules/prometheus-rules.bicep' = if (enableManagedProme
   name: 'prometheus-rules-deployment'
   params: {
     location: location
-    #disable-next-line BCP318
-    azureMonitorWorkspaceId: managedPrometheus.outputs.azureMonitorWorkspaceId
+    azureMonitorWorkspaceId: azureMonitorWorkspaceResourceId
     aksClusterId: aks.outputs.aksId
     aksClusterName: aksClusterName
   }
+  dependsOn: [
+    managedPrometheus
+  ]
 }
 
 // ---------- Recommended Metric Alerts (optional, needs AKS and Managed Prometheus) ----------
@@ -222,11 +238,13 @@ module recommendedMetricAlerts 'modules/recommended-metric-alerts.bicep' = if (e
   params: {
     location: location
     aksClusterId: aks.outputs.aksId
-    #disable-next-line BCP318
-    azureMonitorWorkspaceId: managedPrometheus.outputs.azureMonitorWorkspaceId
-    #disable-next-line BCP318
-    actionGroupResourceId: actionGroup.outputs.actionGroupResourceId
+    azureMonitorWorkspaceId: azureMonitorWorkspaceResourceId
+    actionGroupResourceId: alertActionGroupResourceId
   }
+  dependsOn: [
+    managedPrometheus
+    actionGroup
+  ]
 }
 
 // ---------- Simple Custom Prometheus Alert Demo ----------
@@ -238,10 +256,8 @@ module simplePrometheusAlert 'modules/simple-prometheus-alert.bicep' = if (enabl
     location: location
     aksClusterId: aks.outputs.aksId
     aksClusterName: aksClusterName
-    #disable-next-line BCP318
-    azureMonitorWorkspaceId: managedPrometheus.outputs.azureMonitorWorkspaceId
-    #disable-next-line BCP318
-    actionGroupResourceId: actionGroup.outputs.actionGroupResourceId
+    azureMonitorWorkspaceId: azureMonitorWorkspaceResourceId
+    actionGroupResourceId: alertActionGroupResourceId
     alertOwnerIds: alertOwnerIds
   }
   dependsOn: [
@@ -269,14 +285,34 @@ module diagnosticSettings 'modules/diagnostic-settings.bicep' = if (enableDiagno
   name: 'diagnostic-settings-deployment'
   params: {
     aksClusterName: aks.outputs.aksName
-    #disable-next-line BCP321 BCP318
-    logAnalyticsWorkspaceId: needsLaw ? logAnalytics.outputs.workspaceId : ''
+    logAnalyticsWorkspaceId: logAnalyticsWorkspaceResourceId
   }
+  dependsOn: [
+    logAnalytics
+  ]
 }
 
 // ---------- Container Insights (optional, needs AKS + LAW + Grafana; after MP to avoid AKS conflict) ----------
 
-module containerInsights 'modules/container-insights.bicep' = if (enableContainerInsights) {
+module containerInsightsWithManagedPrometheus 'modules/container-insights.bicep' = if (enableContainerInsights && enableManagedPrometheus) {
+  scope: rg
+  name: 'container-insights-deployment-mp'
+  params: {
+    aksClusterName: aks.outputs.aksName
+    location: location
+    dataCollectionEndpointName: containerInsightsDataCollectionEndpointName
+    dataCollectionRuleName: containerInsightsDataCollectionRuleName
+    logAnalyticsWorkspaceId: logAnalyticsWorkspaceResourceId
+    grafanaPrincipalId: grafana.outputs.grafanaPrincipalId
+    existingDataCollectionEndpointId: managedPrometheusDataCollectionEndpointResourceId
+  }
+  dependsOn: [
+    logAnalytics
+    managedPrometheus
+  ]
+}
+
+module containerInsightsWithoutManagedPrometheus 'modules/container-insights.bicep' = if (enableContainerInsights && !enableManagedPrometheus) {
   scope: rg
   name: 'container-insights-deployment'
   params: {
@@ -284,12 +320,13 @@ module containerInsights 'modules/container-insights.bicep' = if (enableContaine
     location: location
     dataCollectionEndpointName: containerInsightsDataCollectionEndpointName
     dataCollectionRuleName: containerInsightsDataCollectionRuleName
-    #disable-next-line BCP321 BCP318
-    logAnalyticsWorkspaceId: needsLaw ? logAnalytics.outputs.workspaceId : ''
+    logAnalyticsWorkspaceId: logAnalyticsWorkspaceResourceId
     grafanaPrincipalId: grafana.outputs.grafanaPrincipalId
-    #disable-next-line BCP318
-    existingDataCollectionEndpointId: enableManagedPrometheus ? managedPrometheus.outputs.dataCollectionEndpointId : ''
+    existingDataCollectionEndpointId: ''
   }
+  dependsOn: [
+    logAnalytics
+  ]
 }
 
 // ---------- Role Assignments (needs ADX, identity, grafana) ----------
@@ -349,14 +386,10 @@ output adxWebExplorerUrl string = 'https://dataexplorer.azure.com/clusters/${rep
 output adxLogsExplorerUrl string = 'https://dataexplorer.azure.com/clusters/${replace(adx.outputs.adxUri, 'https://', '')}/databases/Logs'
 output grafanaEndpoint string = grafana.outputs.grafanaEndpoint
 output resourceGroupName string = rg.name
-#disable-next-line BCP318
-output azureMonitorWorkspaceId string = enableManagedPrometheus ? managedPrometheus.outputs.azureMonitorWorkspaceId : ''
-#disable-next-line BCP318
-output logAnalyticsPortalUrl string = needsLaw ? 'https://portal.azure.com/#@${tenant().tenantId}/resource${logAnalytics.outputs.workspaceId}/logs' : ''
-#disable-next-line BCP318
-output recommendedMetricAlertRuleGroupNames array = (enableManagedPrometheus && enableRecommendedMetricAlerts) ? recommendedMetricAlerts.outputs.recommendedAlertRuleGroupNames : []
-#disable-next-line BCP318
-output demoCustomAlertRuleGroupName string = (enableManagedPrometheus && enableRecommendedMetricAlerts) ? simplePrometheusAlert.outputs.customAlertRuleGroupName : ''
+output azureMonitorWorkspaceId string = enableManagedPrometheus ? azureMonitorWorkspaceResourceId : ''
+output logAnalyticsPortalUrl string = needsLaw ? 'https://portal.azure.com/#@${tenant().tenantId}/resource${logAnalyticsWorkspaceResourceId}/logs' : ''
+output recommendedMetricAlertRuleGroupNames array = (enableManagedPrometheus && enableRecommendedMetricAlerts) ? recommendedMetricAlertRuleGroupNameList : []
+output demoCustomAlertRuleGroupName string = (enableManagedPrometheus && enableRecommendedMetricAlerts) ? demoCustomAlertRuleGroupNameValue : ''
 output alertLocation string = location
 output azureMonitorAlertPortalUrls array = (enableManagedPrometheus && enableRecommendedMetricAlerts) ? [
   'https://portal.azure.com/#@${tenant().tenantId}/resource/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroupName}/providers/Microsoft.AlertsManagement/prometheusRuleGroups/KubernetesAlert-RecommendedMetricAlerts${aksClusterName}-Cluster-level/overview'
