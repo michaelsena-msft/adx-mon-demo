@@ -115,12 +115,20 @@ flowchart TD
 cp main.sample.bicepparam main.bicepparam
 ```
 
-Edit `main.bicepparam` — at minimum you'll want to grant yourself
-**ADX Viewer + Grafana Admin** access by adding your email (UPN).
+Edit `main.bicepparam`:
+- add your user UPN(s) for **ADX Viewer + Grafana Admin**
+- set an existing **Action Group resource ID** for Azure Monitor alerts
+- set one or more **alert owner/contact identifiers**
 
 ```bicep
 param userPrincipalNames = [
   'yourname@yourtenant.onmicrosoft.com'
+]
+
+param actionGroupResourceId = '/subscriptions/<sub-id>/resourceGroups/<rg-name>/providers/microsoft.insights/actionGroups/<action-group-name>'
+
+param alertOwnerIds = [
+  'youralias'
 ]
 ```
 
@@ -161,6 +169,8 @@ This returns:
 | `resourceGroupName` | Resource group containing all resources |
 | `azureMonitorWorkspaceId` | AMW resource ID (present when Managed Prometheus is enabled) |
 | `logAnalyticsPortalUrl` | Log Analytics query portal (present when Diagnostic Settings or Container Insights is enabled) |
+| `recommendedMetricAlertRuleGroupNames` | Azure Monitor recommended AKS alert rule group names (when enabled) |
+| `demoCustomAlertRuleGroupName` | Name of the simple custom Prometheus alert demo rule group |
 
 ### 4. Try It
 
@@ -297,6 +307,16 @@ When enabled, Bicep deploys an [Azure Monitor Workspace (AMW)](https://learn.mic
 and creates [Prometheus recording rule groups](https://learn.microsoft.com/azure/azure-monitor/containers/prometheus-metrics-scrape-default#recording-rules)
 required by the auto-provisioned Kubernetes Compute dashboards.
 See `modules/prometheus-rules.bicep` for details on why these are declared explicitly.
+
+By default, this deployment also enables Azure Monitor [recommended AKS metric alerts](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/kubernetes-metric-alerts)
+using Microsoft's published template and adds one simple custom Prometheus alert rule group as an example.
+To disable recommended metric alerts:
+
+```bicep
+param enableRecommendedMetricAlerts = false
+```
+
+Log-based Azure Monitor alert rules (`scheduledQueryRules`) are intentionally out of scope in this repo.
 Setting `enableFullPrometheusMetrics` additionally applies the [full metrics profile](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-default)
 and pod-annotation scraping via [`ama-metrics-settings-configmap`](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/prometheus-metrics-scrape-configuration).
 This means custom app metrics (e.g., `nginx_http_requests_total`) appear in both ADX **and** Managed Prometheus — a true dual-pipeline.
@@ -412,6 +432,8 @@ Geneva agent deployment uses Kubernetes manifests (Helm/YAML), not Bicep. See th
 │   ├── grafana-config.bicep      # Deployment script: ADX datasource + dashboards
 │   ├── managed-prometheus.bicep  # AMW, DCE, DCR, DCRA, Grafana link (can be disabled)
 │   ├── prometheus-rules.bicep    # Prometheus recording rules for Kubernetes dashboards
+│   ├── recommended-metric-alerts.bicep # Azure Monitor recommended AKS metric alerts (OOTB)
+│   ├── simple-prometheus-alert.bicep   # Simple custom Prometheus alert demo rule
 │   ├── diagnostic-settings.bicep # AKS control-plane logs to LAW (can be disabled)
 │   ├── container-insights.bicep  # Container logs + K8s inventory to LAW (can be disabled)
 │   └── log-analytics.bicep       # Shared LAW (used by diagnostic-settings and container-insights)
@@ -439,6 +461,9 @@ All parameters have sensible defaults. See `main.sample.bicepparam` for the full
 | `adxSkuName` / `adxSkuCapacity` | `Standard_E2ads_v5` / `2` | ADX cluster sizing |
 | `userPrincipalNames` | `[]` | UPN emails (e.g. `alias@tenant.onmicrosoft.com`) → ADX Viewer + Grafana Admin. Resolved via [Microsoft Graph extension](https://learn.microsoft.com/graph/templates/bicep/whats-new) |
 | `enableManagedPrometheus` | `true` | Deploy Managed Prometheus alongside adx-mon ([details](#managed-prometheus-enabled-by-default)) |
+| `enableRecommendedMetricAlerts` | `true` | Deploy Azure Monitor recommended AKS metric alerts and a simple custom alert demo rule ([details](#managed-prometheus-enabled-by-default)) |
+| `actionGroupResourceId` | _required_ | Existing Azure Monitor Action Group resource ID used by alert rules |
+| `alertOwnerIds` | _required_ | Alert owner/contact identifiers used as metadata on custom demo alerts |
 | `enableFullPrometheusMetrics` | `true` | Full metrics profile + pod-annotation scraping ([details](#managed-prometheus-enabled-by-default)) |
 | `enableDiagnosticSettings` | `true` | Send AKS control-plane logs to Log Analytics ([details](#aks-diagnostic-settings-enabled-by-default)) |
 | `enableContainerInsights` | `true` | Collect container logs + K8s inventory via Container Insights ([details](#container-insights-enabled-by-default)) |

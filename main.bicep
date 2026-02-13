@@ -41,6 +41,15 @@ param deployTimestamp string = utcNow()
 @description('Enable Managed Prometheus for AKS metrics collection.')
 param enableManagedPrometheus bool = true
 
+@description('Enable Azure Monitor recommended AKS metric alerts.')
+param enableRecommendedMetricAlerts bool = true
+
+@description('Resource ID of the Azure Monitor Action Group used by alert rules.')
+param actionGroupResourceId string
+
+@description('Alert owner/contact identifiers used as alert metadata (for example: aliases).')
+param alertOwnerIds string[]
+
 @description('Enable full Prometheus metrics profile and pod-annotation scraping.')
 param enableFullPrometheusMetrics bool = true
 
@@ -154,6 +163,39 @@ module prometheusRules 'modules/prometheus-rules.bicep' = if (enableManagedProme
   }
 }
 
+// ---------- Recommended Metric Alerts (optional, needs AKS and Managed Prometheus) ----------
+
+module recommendedMetricAlerts 'modules/recommended-metric-alerts.bicep' = if (enableManagedPrometheus && enableRecommendedMetricAlerts) {
+  scope: rg
+  name: 'recommended-metric-alerts-deployment'
+  params: {
+    location: location
+    aksClusterId: aks.outputs.aksId
+    #disable-next-line BCP318
+    azureMonitorWorkspaceId: managedPrometheus.outputs.azureMonitorWorkspaceId
+    actionGroupResourceId: actionGroupResourceId
+  }
+}
+
+// ---------- Simple Custom Prometheus Alert Demo ----------
+
+module simplePrometheusAlert 'modules/simple-prometheus-alert.bicep' = if (enableManagedPrometheus && enableRecommendedMetricAlerts) {
+  scope: rg
+  name: 'simple-prometheus-alert-deployment'
+  params: {
+    location: location
+    aksClusterId: aks.outputs.aksId
+    aksClusterName: aksClusterName
+    #disable-next-line BCP318
+    azureMonitorWorkspaceId: managedPrometheus.outputs.azureMonitorWorkspaceId
+    actionGroupResourceId: actionGroupResourceId
+    alertOwnerIds: alertOwnerIds
+  }
+  dependsOn: [
+    recommendedMetricAlerts
+  ]
+}
+
 // ---------- Log Analytics Workspace (shared by Diagnostic Settings and Container Insights) ----------
 
 var needsLaw = enableDiagnosticSettings || enableContainerInsights
@@ -255,3 +297,7 @@ output resourceGroupName string = rg.name
 output azureMonitorWorkspaceId string = enableManagedPrometheus ? managedPrometheus.outputs.azureMonitorWorkspaceId : ''
 #disable-next-line BCP318
 output logAnalyticsPortalUrl string = needsLaw ? 'https://portal.azure.com/#@${tenant().tenantId}/resource${logAnalytics.outputs.workspaceId}/logs' : ''
+#disable-next-line BCP318
+output recommendedMetricAlertRuleGroupNames array = (enableManagedPrometheus && enableRecommendedMetricAlerts) ? recommendedMetricAlerts.outputs.recommendedAlertRuleGroupNames : []
+#disable-next-line BCP318
+output demoCustomAlertRuleGroupName string = (enableManagedPrometheus && enableRecommendedMetricAlerts) ? simplePrometheusAlert.outputs.customAlertRuleGroupName : ''
