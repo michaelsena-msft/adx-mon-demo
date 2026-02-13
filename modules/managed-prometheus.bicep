@@ -13,6 +13,9 @@ param dataCollectionEndpointName string
 @description('Name of the Data Collection Rule for Prometheus.')
 param dataCollectionRuleName string
 
+@description('Existing Data Collection Endpoint ID (e.g. from Container Insights). If empty, a new DCE is created.')
+param existingDataCollectionEndpointId string = ''
+
 @description('Principal ID of the Grafana managed identity to grant Monitoring Reader.')
 param grafanaPrincipalId string
 
@@ -20,13 +23,15 @@ param grafanaPrincipalId string
 param grafanaName string
 
 var monitoringReaderRoleId = '43d0d8ad-25c7-4714-9337-8ba259a9fe05'
+var createDce = empty(existingDataCollectionEndpointId)
+var effectiveDceId = createDce ? dce.id : existingDataCollectionEndpointId
 
 resource amw 'Microsoft.Monitor/accounts@2023-04-03' = {
   name: azureMonitorWorkspaceName
   location: location
 }
 
-resource dce 'Microsoft.Insights/dataCollectionEndpoints@2024-03-11' = {
+resource dce 'Microsoft.Insights/dataCollectionEndpoints@2024-03-11' = if (createDce) {
   name: dataCollectionEndpointName
   location: location
   kind: 'Linux'
@@ -42,7 +47,7 @@ resource dcr 'Microsoft.Insights/dataCollectionRules@2024-03-11' = {
   location: location
   kind: 'Linux'
   properties: {
-    dataCollectionEndpointId: dce.id
+    dataCollectionEndpointId: effectiveDceId
     dataSources: {
       prometheusForwarder: [
         {
@@ -79,11 +84,12 @@ resource aksCluster 'Microsoft.ContainerService/managedClusters@2024-09-01' exis
   name: aksClusterName
 }
 
-resource dcra 'Microsoft.Insights/dataCollectionRuleAssociations@2024-03-11' = {
+// Only create DCE association when we own the DCE (otherwise CI already set configurationAccessEndpoint)
+resource dcra 'Microsoft.Insights/dataCollectionRuleAssociations@2024-03-11' = if (createDce) {
   name: 'configurationAccessEndpoint'
   scope: aksCluster
   properties: {
-    dataCollectionEndpointId: dce.id
+    dataCollectionEndpointId: effectiveDceId
     description: 'DCE association for AKS Prometheus metrics'
   }
 }
@@ -140,4 +146,4 @@ resource grafanaAmwLink 'Microsoft.Dashboard/grafana@2024-10-01' = {
 output azureMonitorWorkspaceId string = amw.id
 
 @description('Resource ID of the Data Collection Endpoint.')
-output dataCollectionEndpointId string = dce.id
+output dataCollectionEndpointId string = effectiveDceId
