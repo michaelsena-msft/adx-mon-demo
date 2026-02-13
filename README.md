@@ -48,12 +48,22 @@ flowchart LR
     style LAW fill:#e8f0fe,stroke:#1a73e8,stroke-dasharray: 5 5
 ```
 
-**Solid lines** = core adx-mon pipeline (always deployed).
+**Solid lines** = core ADX/Kusto pathway (implemented by adx-mon, always deployed).
 **Dashed lines** = [Managed Prometheus](#managed-prometheus-enabled-by-default), [Diagnostic Settings](#aks-diagnostic-settings-enabled-by-default), and [Container Insights](#container-insights-enabled-by-default) — enabled by default but can be disabled.
 
 Each Prometheus metric becomes its own table in the **Metrics** database (~680+ tables).
 Logs land in tables created per [`log-destination` annotation](#logs-pod-annotations) in the
 **Logs** database. System tables (`Collector`, `Ingestor`, `Kubelet`) are created automatically.
+
+## Pathway Terminology Reference
+
+Use **ADX/Kusto pathway** when describing the ADX data path. Use **adx-mon** for the collector/ingestor implementation that powers that pathway.
+
+| Pathway name | Underlying tech name | Key terminology |
+|---|---|---|
+| ADX/Kusto pathway (via adx-mon) | Azure Data Explorer (ADX, Kusto engine) | Collector, Ingestor, Metrics DB, Logs DB, KQL |
+| Managed Prometheus pathway | Azure Monitor Workspace (AMW) for Prometheus metrics | ama-metrics, DCE, DCR, DCRA, PromQL, recording rules |
+| Geneva pathway (WIP) | Geneva data pipeline (MDM + MDSD) | StatsD, MetricsExtension, Fluentd, MDM, MDSD, warm path |
 
 ## Bicep Module Graph
 
@@ -72,7 +82,7 @@ flowchart TD
 
     aks --> identity["identity.bicep\nManaged Identities"]
 
-    aks & grafana -.-> mp["managed-prometheus.bicep\nAMW + DCE/DCR"]
+    aks & grafana -.-> mp["managed-prometheus.bicep\nAMW + DCE/DCR/DCRA"]
     mp & aks -.-> rules["prometheus-rules.bicep\n48 Recording Rules"]
 
     law & aks -.-> diag["diagnostic-settings.bicep\nControl-Plane Logs"]
@@ -339,7 +349,7 @@ populate with flow data automatically.
 
 A bundled **Demo App** dashboard is deployed automatically with panels arranged for side-by-side comparison:
 
-| ADX (via adx-mon) | Managed Prometheus | Container Insights |
+| ADX/Kusto (via adx-mon) | Managed Prometheus | Container Insights |
 |---|---|---|
 | Request Rate (`NginxHttpRequestsTotal`) | Request Rate (`nginx_http_requests_total`) | — |
 | Container CPU | Container CPU | — |
@@ -362,11 +372,11 @@ The deployment script calls `az grafana dashboard create` for each entry.
 
 ## Future: Geneva Integration
 
-[Geneva](https://eng.ms/docs/products/geneva/getting_started/environments/akslinux) (Microsoft's internal monitoring platform) can coexist with adx-mon on the same AKS cluster. Each system runs independent DaemonSets with no conflicts.
+[Geneva](https://eng.ms/docs/products/geneva/getting_started/environments/akslinux) (Microsoft's internal monitoring platform) can coexist with adx-mon on the same AKS cluster. The ADX/Kusto pathway and Geneva pathway run independently and do not conflict.
 
-| Signal | Geneva Path |
+| Signal | Geneva pathway details |
 |--------|-------------|
-| Metrics | StatsD → MetricsExtension → MDM, or Managed Prometheus → AMW → MDM |
+| Metrics | StatsD → MetricsExtension → MDM, or Managed Prometheus pathway (ama-metrics → AMW) → MDM |
 | Logs | stdout → Fluentd → MDSD → Geneva warm path |
 
 Geneva agent deployment uses Kubernetes manifests (Helm/YAML), not Bicep. See the [Geneva on AKS guide](https://eng.ms/docs/products/geneva/getting_started/environments/akslinux) for setup.
