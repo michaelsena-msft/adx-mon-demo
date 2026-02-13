@@ -65,6 +65,18 @@ resource aksClusterAdminRole 'Microsoft.Authorization/roleAssignments@2022-04-01
   }
 }
 
+// Give the deployer identity "Azure Kubernetes Service RBAC Cluster Admin" on the AKS cluster
+// Required for clusters with Azure RBAC enabled (disableLocalAccounts: true)
+resource aksRbacClusterAdminRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(aksCluster.id, deployerIdentity.id, 'b1ff04bb-8a4e-4dc4-8eb5-8693973ce19b')
+  scope: aksCluster
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b1ff04bb-8a4e-4dc4-8eb5-8693973ce19b')
+    principalId: deployerIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 // Reference the existing AKS cluster for scoped role assignment
 resource aksCluster 'Microsoft.ContainerService/managedClusters@2024-09-01' existing = {
   name: aksClusterName
