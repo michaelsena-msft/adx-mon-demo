@@ -9,7 +9,7 @@ spec:
     .create-or-alter function CountCardinality () {
       union withsource=table *
       | where Timestamp >= ago(1h) and Timestamp < ago(5m)
-      | summarize Value=toreal(dcount(SeriesId)) by table
+      | summarize Value=toreal(dcount(column_ifexists('SeriesId', tolong('')))) by table
       | extend SeriesId=hash_xxhash64(table)
       | extend Timestamp=bin(now(), 1m)
       | extend Labels=bag_pack_columns(table)

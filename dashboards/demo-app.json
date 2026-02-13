@@ -48,7 +48,7 @@
               "type": "and"
             }
           },
-          "query": "NginxHttpRequestsTotal\n| where $__timeFilter(Timestamp)\n| where Cluster == \"aks-adx-mon\"\n| invoke prom_delta()\n| summarize Value=sum(Value) by bin(Timestamp, 30s)\n| order by Timestamp asc",
+          "query": "NginxHttpRequestsTotal\n| where $__timeFilter(Timestamp)\n| invoke prom_delta()\n| summarize Value=sum(Value) by bin(Timestamp, 30s)\n| order by Timestamp asc",
           "refId": "A"
         }
       ],
@@ -165,7 +165,7 @@
               "type": "and"
             }
           },
-          "query": "ContainerCpuUsageSecondsTotal\n| where $__timeFilter(Timestamp)\n| where Cluster == \"aks-adx-mon\"\n| where Labels.pod startswith \"demo-app\"\n| where Labels.container == \"nginx\"\n| invoke prom_delta()\n| summarize Value=avg(Value) by bin(Timestamp, 30s), tostring(Labels.pod)\n| order by Timestamp asc",
+          "query": "ContainerCpuUsageSecondsTotal\n| where $__timeFilter(Timestamp)\n| where Labels.pod startswith \"demo-app\"\n| where Labels.container == \"nginx\"\n| invoke prom_delta()\n| summarize Value=avg(Value) by bin(Timestamp, 30s), tostring(Labels.pod)\n| order by Timestamp asc",
           "refId": "A"
         }
       ],
@@ -282,7 +282,7 @@
               "type": "and"
             }
           },
-          "query": "ContainerMemoryWorkingSetBytes\n| where $__timeFilter(Timestamp)\n| where Cluster == \"aks-adx-mon\"\n| where Labels.pod startswith \"demo-app\"\n| where Labels.container == \"nginx\"\n| summarize Value=avg(Value) by bin(Timestamp, 30s), tostring(Labels.pod)\n| order by Timestamp asc",
+          "query": "ContainerMemoryWorkingSetBytes\n| where $__timeFilter(Timestamp)\n| where Labels.pod startswith \"demo-app\"\n| where Labels.container == \"nginx\"\n| summarize Value=avg(Value) by bin(Timestamp, 30s), tostring(Labels.pod)\n| order by Timestamp asc",
           "refId": "A"
         }
       ],
