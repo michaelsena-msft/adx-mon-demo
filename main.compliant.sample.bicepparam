@@ -1,8 +1,43 @@
 using 'main.bicep'
 
-// SAMPLE ONLY: Copy to a new params file (e.g., main.bicepparam) and replace REPLACE_ME values.
+// SAMPLE ONLY: Deploy into an existing compliant AKS cluster (BYO AKS).
+// Copy to main.bicepparam and replace placeholder values.
 // Do NOT commit real parameter values.
 
+// Existing AKS cluster (must already exist in the same resource group this deployment uses).
+param resourceGroupName = 'rg-your-existing-aks'
+param aksClusterName = 'aks-your-existing-cluster'
+param createAks = false
 
-// Deploy to the existing compliant AKS cluster'REPLACE_ME'rg-aks1p-ipv4-michaelsena-eastus2-00'REPLACE_ME'eastus2'REPLACE_ME'aks-ipv4-aks1p-michaelsena-00'REPLACE_ME'https://eastus2.oic.prod-aks.azure.com/GUID_REPLACE_ME/GUID_REPLACE_ME/'REPLACE_ME'adxmoncmplaks1p'REPLACE_ME'grafana-adxmon-cmpl'REPLACE_ME'id-adxmon-cmpl'REPLACE_ME'id-adxmon-cmpl-deployer'REPLACE_ME'law-adxmon-cmpl'REPLACE_ME'amw-adxmon-cmpl'REPLACE_ME'dce-adxmon-cmpl'REPLACE_ME'dcr-adxmon-cmpl-prometheus'REPLACE_ME'dce-adxmon-cmpl-ci'REPLACE_ME'dcr-adxmon-cmpl-ci'REPLACE_ME'ag-adxmon-cmpl'REPLACE_ME'primary'REPLACE_ME'michaelsena@microsoft.com'REPLACE_ME'michaelsena'REPLACE_ME'michaelsena@tme01.onmicrosoft.com'
+// Required when createAks = false.
+// Fetch it with:
+// az aks show -g <resourceGroupName> -n <aksClusterName> --query oidcIssuerProfile.issuerUrl -o tsv
+param existingAksOidcIssuerUrl = 'https://<region>.oic.prod-aks.azure.com/<tenant>/<cluster>/'
+
+// ---------- Access (recommended) ----------
+
+// UPN emails to grant ADX Viewer + Grafana Admin access.
+// For TME tenant, use alias@tme01.onmicrosoft.com
+param userPrincipalNames = [
+  'yourname@yourtenant.onmicrosoft.com'
 ]
+
+// ---------- Alerts (required) ----------
+
+param alertEmailReceivers = [
+  {
+    name: 'primary'
+    emailAddress: 'yourname@yourtenant.onmicrosoft.com'
+  }
+]
+
+param alertOwnerIds = [
+  'youralias'
+]
+
+// ---------- Optional feature toggles ----------
+
+// param enableManagedPrometheus = false
+// param enableContainerInsights = false
+// param enableDiagnosticSettings = false
+

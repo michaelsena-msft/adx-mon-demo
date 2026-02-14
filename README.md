@@ -378,26 +378,6 @@ The deployment script calls `az grafana dashboard create` for each entry.
 
 Geneva agent deployment uses Kubernetes manifests (Helm/YAML), not Bicep. See the [Geneva on AKS guide](https://eng.ms/docs/products/geneva/getting_started/environments/akslinux) for setup.
 
-## Parameters
-
-All parameters have sensible defaults. See `main.sample.bicepparam` for the full list. Key parameters:
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `location` | `eastus2` | Azure region for all resources |
-| `resourceGroupName` | `rg-adx-mon` | Resource group name |
-| `nodeVmSize` / `nodeCount` | `Standard_D4s_v3` / `2` | AKS node pool sizing |
-| `adxSkuName` / `adxSkuCapacity` | `Standard_E2ads_v5` / `2` | ADX cluster sizing |
-| `userPrincipalNames` | `[]` | UPN emails (e.g. `alias@tenant.onmicrosoft.com`) → ADX Viewer + Grafana Admin. Resolved via [Microsoft Graph extension](https://learn.microsoft.com/graph/templates/bicep/whats-new) |
-| `enableManagedPrometheus` | `true` | Deploy Managed Prometheus alongside adx-mon (includes full metrics profile + recommended alerts) ([details](#managed-prometheus-enabled-by-default)) |
-| `actionGroupName` | `ag-adx-mon` | Azure Monitor Action Group name used by alert rules |
-| `alertEmailReceivers` | _required_ | Email receivers attached to the Action Group used by alert rules |
-| `alertOwnerIds` | _required_ | Alert owner/contact identifiers used as metadata on custom demo alerts |
-| `enableDiagnosticSettings` | `true` | Send AKS control-plane logs to Log Analytics ([details](#aks-diagnostic-settings-enabled-by-default)) |
-| `enableContainerInsights` | `true` | Collect container logs + K8s inventory via Container Insights ([details](#container-insights-enabled-by-default)) |
-| `dashboardDefinitions` | `[]` | Grafana dashboard JSON definitions to provision ([details](#grafana-dashboards)) |
-| `forceScriptRerun` | `''` | Set to any unique value (e.g. a timestamp) to force deployment scripts to re-execute. Leave empty for normal idempotent behavior |
-
 ## Further Reading
 
 - [adx-mon on GitHub](https://github.com/Azure/adx-mon) — source, configuration, and CRD reference
