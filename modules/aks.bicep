@@ -23,6 +23,15 @@ resource aks 'Microsoft.ContainerService/managedClusters@2024-09-01' = {
     kubernetesVersion: kubernetesVersion
     dnsPrefix: clusterName
     enableRBAC: true
+    disableLocalAccounts: true
+    aadProfile: {
+      managed: true
+      enableAzureRBAC: true
+    }
+    autoUpgradeProfile: {
+      nodeOSUpgradeChannel: 'NodeImage'
+      upgradeChannel: 'patch'
+    }
     oidcIssuerProfile: {
       enabled: true
     }
