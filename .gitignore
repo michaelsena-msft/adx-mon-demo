@@ -1,6 +1,8 @@
 PLAN.md
 commands.txt
-main.bicepparam
+# Local Bicep parameter files may contain sensitive values. Only commit *.sample.bicepparam.
+*.bicepparam
+!*.sample.bicepparam
 *.json
 !bicepconfig.json
 !dashboards/*.json
