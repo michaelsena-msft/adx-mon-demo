@@ -112,6 +112,11 @@ resource applyK8sManifests 'Microsoft.Resources/deploymentScripts@2023-08-01' = 
       echo "=== Annotating CoreDNS for log capture ==="
       kubectl patch deployment coredns -n kube-system --type merge -p '{"spec":{"template":{"metadata":{"annotations":{"adx-mon/scrape":"true","adx-mon/port":"9153","adx-mon/path":"/metrics","adx-mon/log-destination":"Logs:CoreDNS","adx-mon/log-parsers":""}}}}}' || true
 
+      echo "=== Restarting adx-mon workloads to pick up latest identity ==="
+      kubectl rollout restart statefulset/ingestor -n adx-mon
+      kubectl rollout restart daemonset/collector -n adx-mon
+      kubectl rollout restart deployment/collector-singleton -n adx-mon
+
       echo "=== Deployment complete. Pod status: ==="
       kubectl get pods -n adx-mon
       kubectl get pods -n monitoring
