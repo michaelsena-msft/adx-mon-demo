@@ -377,8 +377,3 @@ The deployment script calls `az grafana dashboard create` for each entry.
 | Logs | stdout → Fluentd → MDSD → Geneva warm path |
 
 Geneva agent deployment uses Kubernetes manifests (Helm/YAML), not Bicep. See the [Geneva on AKS guide](https://eng.ms/docs/products/geneva/getting_started/environments/akslinux) for setup.
-
-## Further Reading
-
-- [adx-mon on GitHub](https://github.com/Azure/adx-mon) — source, configuration, and CRD reference
-- [COMPARISONS.md](COMPARISONS.md) — adx-mon vs. Managed Prometheus vs. Container Insights coverage comparison
