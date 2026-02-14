@@ -25,7 +25,3 @@ resource actionGroup 'Microsoft.Insights/actionGroups@2023-01-01' = {
     }]
   }
 }
-
-@description('Resource ID of the Action Group.')
-output actionGroupResourceId string = actionGroup.id
-

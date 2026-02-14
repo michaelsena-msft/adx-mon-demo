@@ -17,6 +17,3 @@ resource law 'Microsoft.OperationalInsights/workspaces@2025-02-01' = {
     }
   }
 }
-
-@description('Resource ID of the Log Analytics workspace.')
-output workspaceId string = law.id

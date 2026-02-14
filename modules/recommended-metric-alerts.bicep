@@ -10,9 +10,6 @@ param azureMonitorWorkspaceId string
 @description('Resource ID of the Action Group that should receive alert notifications.')
 param actionGroupResourceId string
 
-var clusterName = last(split(aksClusterId, '/'))
-var recommendedAlertRuleGroupPrefix = 'KubernetesAlert-RecommendedMetricAlerts${clusterName}'
-
 #disable-next-line no-deployments-resources
 resource recommendedMetricAlertsTemplate 'Microsoft.Resources/deployments@2024-03-01' = {
   name: 'recommended-metric-alerts-template'
@@ -38,9 +35,3 @@ resource recommendedMetricAlertsTemplate 'Microsoft.Resources/deployments@2024-0
     }
   }
 }
-
-output recommendedAlertRuleGroupNames array = [
-  '${recommendedAlertRuleGroupPrefix}-Cluster-level'
-  '${recommendedAlertRuleGroupPrefix}-Node-level'
-  '${recommendedAlertRuleGroupPrefix}-Pod-level'
-]

@@ -200,19 +200,11 @@ This returns:
 | Output | Use |
 |--------|-----|
 | `aksClusterName` | AKS cluster name (for `az aks get-credentials`) |
-| `adxWebExplorerUrl` | Query metrics in the [ADX Web Explorer](https://learn.microsoft.com/en-us/azure/data-explorer/web-query-data) |
-| `adxLogsExplorerUrl` | Query logs in the ADX Web Explorer |
-| `adxClusterUri` | Programmatic access to ADX |
+| `adxWebExplorerUrl` | Query metrics and logs in the [ADX Web Explorer](https://learn.microsoft.com/en-us/azure/data-explorer/web-query-data) |
 | `grafanaEndpoint` | Build dashboards (you have Grafana Admin). Explore: append `/explore`. |
-| `resourceGroupName` | Resource group containing all resources |
 | `azureMonitorWorkspaceId` | AMW resource ID (present when Managed Prometheus is enabled) |
 | `logAnalyticsPortalUrl` | Log Analytics query portal (present when Diagnostic Settings or Container Insights is enabled) |
-| `recommendedMetricAlertRuleGroupNames` | Azure Monitor recommended AKS alert rule group names (when enabled) |
-| `demoCustomAlertRuleGroupName` | Name of the simple custom Prometheus alert demo rule group |
-| `alertLocation` | Azure region where alert rule groups are deployed |
 | `azureMonitorAlertPortalUrls` | Direct Azure portal URLs for all Azure Monitor Prometheus alert rule groups |
-| `adxMonSampleAlertRuleFile` | Repo path to the sample adx-mon AlertRule YAML |
-| `adxMonSampleAlertKubectlCommand` | Command to inspect the deployed sample adx-mon AlertRule in AKS |
 
 ## Collecting Your Application Data
 

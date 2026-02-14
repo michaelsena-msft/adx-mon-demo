@@ -62,11 +62,5 @@ resource aks 'Microsoft.ContainerService/managedClusters@2024-09-01' = {
   }
 }
 
-@description('The name of the AKS cluster.')
-output aksName string = aks.name
-
-@description('The resource ID of the AKS cluster.')
-output aksId string = aks.id
-
 @description('The OIDC issuer URL of the AKS cluster.')
 output oidcIssuerUrl string = aks.properties.oidcIssuerProfile.issuerURL

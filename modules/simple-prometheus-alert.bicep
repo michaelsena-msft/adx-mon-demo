@@ -62,5 +62,3 @@ resource simpleCustomAlertRuleGroup 'Microsoft.AlertsManagement/prometheusRuleGr
     ]
   }
 }
-
-output customAlertRuleGroupName string = simpleCustomAlertRuleGroup.name

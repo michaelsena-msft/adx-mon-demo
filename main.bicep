@@ -124,14 +124,6 @@ var managedPrometheusDataCollectionEndpointResourceId = resourceId(subscription(
 var logAnalyticsWorkspaceResourceId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.OperationalInsights/workspaces', logAnalyticsWorkspaceName)
 var alertActionGroupResourceId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.Insights/actionGroups', actionGroupName)
 
-var recommendedAlertRuleGroupPrefix = 'KubernetesAlert-RecommendedMetricAlerts${aksClusterName}'
-var recommendedMetricAlertRuleGroupNameList = [
-  '${recommendedAlertRuleGroupPrefix}-Cluster-level'
-  '${recommendedAlertRuleGroupPrefix}-Node-level'
-  '${recommendedAlertRuleGroupPrefix}-Pod-level'
-]
-var demoCustomAlertRuleGroupNameValue = 'DemoCustomAlertsRuleGroup-${aksClusterName}'
-
 // Resolve AKS OIDC issuer URL from module output or param
 #disable-next-line BCP318
 var aksOidcIssuerUrl = createAks ? aks.outputs.oidcIssuerUrl : existingAksOidcIssuerUrl
@@ -392,21 +384,13 @@ module grafanaConfig 'modules/grafana-config.bicep' = {
 // ---------- Outputs ----------
 
 output aksClusterName string = aksClusterName
-output adxClusterUri string = adx.outputs.adxUri
-output adxWebExplorerUrl string = 'https://dataexplorer.azure.com/clusters/${replace(adx.outputs.adxUri, 'https://', '')}/databases/Metrics'
-output adxLogsExplorerUrl string = 'https://dataexplorer.azure.com/clusters/${replace(adx.outputs.adxUri, 'https://', '')}/databases/Logs'
+output adxWebExplorerUrl string = 'https://dataexplorer.azure.com/clusters/${replace(adx.outputs.adxUri, 'https://', '')}'
 output grafanaEndpoint string = grafana.outputs.grafanaEndpoint
-output resourceGroupName string = rg.name
 output azureMonitorWorkspaceId string = enableManagedPrometheus ? azureMonitorWorkspaceResourceId : ''
 output logAnalyticsPortalUrl string = needsLaw ? 'https://portal.azure.com/#@${tenant().tenantId}/resource${logAnalyticsWorkspaceResourceId}/logs' : ''
-output recommendedMetricAlertRuleGroupNames array = enableManagedPrometheus ? recommendedMetricAlertRuleGroupNameList : []
-output demoCustomAlertRuleGroupName string = enableManagedPrometheus ? demoCustomAlertRuleGroupNameValue : ''
-output alertLocation string = location
 output azureMonitorAlertPortalUrls array = enableManagedPrometheus ? [
   'https://portal.azure.com/#@${tenant().tenantId}/resource/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroupName}/providers/Microsoft.AlertsManagement/prometheusRuleGroups/KubernetesAlert-RecommendedMetricAlerts${aksClusterName}-Cluster-level/overview'
   'https://portal.azure.com/#@${tenant().tenantId}/resource/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroupName}/providers/Microsoft.AlertsManagement/prometheusRuleGroups/KubernetesAlert-RecommendedMetricAlerts${aksClusterName}-Node-level/overview'
   'https://portal.azure.com/#@${tenant().tenantId}/resource/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroupName}/providers/Microsoft.AlertsManagement/prometheusRuleGroups/KubernetesAlert-RecommendedMetricAlerts${aksClusterName}-Pod-level/overview'
   'https://portal.azure.com/#@${tenant().tenantId}/resource/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroupName}/providers/Microsoft.AlertsManagement/prometheusRuleGroups/DemoCustomAlertsRuleGroup-${aksClusterName}/overview'
 ] : []
-output adxMonSampleAlertRuleFile string = 'k8s/sample-alertrule.yaml'
-output adxMonSampleAlertKubectlCommand string = 'kubectl -n adx-mon get alertrule pod-restart-alert -o yaml'
