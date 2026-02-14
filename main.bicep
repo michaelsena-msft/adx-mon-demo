@@ -208,6 +208,9 @@ module managedPrometheus 'modules/managed-prometheus.bicep' = if (enableManagedP
     grafanaPrincipalId: grafana.outputs.grafanaPrincipalId
     grafanaName: grafana.outputs.grafanaName
   }
+  dependsOn: [
+    aks
+  ]
 }
 
 // ---------- Prometheus Recording Rules (optional, needs AKS and Managed Prometheus) ----------
@@ -294,6 +297,7 @@ module diagnosticSettings 'modules/diagnostic-settings.bicep' = if (enableDiagno
   }
   dependsOn: [
     logAnalytics
+    aks
   ]
 }
 
@@ -314,6 +318,7 @@ module containerInsightsWithManagedPrometheus 'modules/container-insights.bicep'
   dependsOn: [
     logAnalytics
     managedPrometheus
+    diagnosticSettings
   ]
 }
 
@@ -331,6 +336,8 @@ module containerInsightsWithoutManagedPrometheus 'modules/container-insights.bic
   }
   dependsOn: [
     logAnalytics
+    aks
+    diagnosticSettings
   ]
 }
 
