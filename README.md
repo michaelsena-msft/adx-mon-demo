@@ -378,46 +378,6 @@ The deployment script calls `az grafana dashboard create` for each entry.
 
 Geneva agent deployment uses Kubernetes manifests (Helm/YAML), not Bicep. See the [Geneva on AKS guide](https://eng.ms/docs/products/geneva/getting_started/environments/akslinux) for setup.
 
-## File Structure
-
-```
-├── main.bicep                    # Subscription-scope orchestrator
-├── main.sample.bicepparam        # Sample parameters (copy → main.bicepparam)
-├── bicepconfig.json              # Bicep linter config + Graph extension
-├── dashboards/
-│   └── demo-app.json             # Bundled Grafana dashboard (ADX vs Prometheus)
-├── rules/
-│   ├── node-recording-rules.json       # Node-level recording rules (11 rules)
-│   ├── kubernetes-recording-rules.json # Kubernetes recording rules (19 rules)
-│   └── ux-recording-rules.json         # UX recording rules (18 rules)
-├── modules/
-│   ├── aks.bicep                 # AKS with OIDC + workload identity + ACNS network observability
-│   ├── adx.bicep                 # ADX cluster + Metrics/Logs databases (streaming ingestion)
-│   ├── identity.bicep            # Managed identities + federated credentials
-│   ├── grafana.bicep             # Managed Grafana workspace
-│   ├── role-assignments.bicep    # ADX RBAC + Grafana Admin (adx-mon, Grafana, users)
-│   ├── k8s-workloads.bicep       # Deployment script: applies K8s manifests
-│   ├── grafana-config.bicep      # Deployment script: ADX datasource + dashboards
-│   ├── managed-prometheus.bicep  # AMW, DCE, DCR, DCRA, Grafana link (can be disabled)
-│   ├── prometheus-rules.bicep    # Prometheus recording rules for Kubernetes dashboards
-│   ├── action-group.bicep         # Azure Monitor Action Group (email receivers)
-│   ├── recommended-metric-alerts.bicep # Azure Monitor recommended AKS metric alerts (OOTB)
-│   ├── simple-prometheus-alert.bicep   # Simple custom Prometheus alert demo rule
-│   ├── diagnostic-settings.bicep # AKS control-plane logs to LAW (can be disabled)
-│   ├── container-insights.bicep  # Container logs + K8s inventory to LAW (can be disabled)
-│   └── log-analytics.bicep       # Shared LAW (used by diagnostic-settings and container-insights)
-└── k8s/
-    ├── crds.yaml                 # adx-mon Custom Resource Definitions
-    ├── ingestor.yaml             # Ingestor StatefulSet
-    ├── collector.yaml            # Collector DaemonSet + Singleton
-    ├── ksm.yaml                  # kube-state-metrics (auto-sharded)
-    ├── demo-app.yaml             # nginx + exporter sidecar with dual-pipeline annotations
-    ├── demo-app-trafficgen.yaml  # Optional semi-random traffic generator for demo-app
-    ├── ama-metrics-settings.yaml # ConfigMap for Managed Prometheus scrape settings
-    ├── functions.yaml            # Sample Function + ManagementCommand CRs
-    └── sample-alertrule.yaml     # Sample AlertRule for pod restart detection
-```
-
 ## Parameters
 
 All parameters have sensible defaults. See `main.sample.bicepparam` for the full list. Key parameters:
