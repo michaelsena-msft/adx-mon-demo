@@ -203,7 +203,7 @@ This returns:
 | `adxWebExplorerUrl` | Query metrics in the [ADX Web Explorer](https://learn.microsoft.com/en-us/azure/data-explorer/web-query-data) |
 | `adxLogsExplorerUrl` | Query logs in the ADX Web Explorer |
 | `adxClusterUri` | Programmatic access to ADX |
-| `grafanaEndpoint` | Build dashboards (you have Grafana Admin) |
+| `grafanaEndpoint` | Build dashboards (you have Grafana Admin). Explore: append `/explore`. |
 | `resourceGroupName` | Resource group containing all resources |
 | `azureMonitorWorkspaceId` | AMW resource ID (present when Managed Prometheus is enabled) |
 | `logAnalyticsPortalUrl` | Log Analytics query portal (present when Diagnostic Settings or Container Insights is enabled) |
@@ -213,92 +213,6 @@ This returns:
 | `azureMonitorAlertPortalUrls` | Direct Azure portal URLs for all Azure Monitor Prometheus alert rule groups |
 | `adxMonSampleAlertRuleFile` | Repo path to the sample adx-mon AlertRule YAML |
 | `adxMonSampleAlertKubectlCommand` | Command to inspect the deployed sample adx-mon AlertRule in AKS |
-
-### 4. Try It
-
-The demo app responds on `http://demo-app/` inside the cluster. Generate traffic and watch
-the dashboard update:
-
-```bash
-# Get cluster credentials
-az aks get-credentials --resource-group rg-adx-mon --name aks-adx-mon
-
-# Single request
-kubectl run -it --rm curl --image=curlimages/curl --restart=Never -- curl -s http://demo-app/
-
-# Load test — watch Request Rate spike on the dashboard
-kubectl run -it --rm loadgen --image=curlimages/curl --restart=Never -- \
-  sh -c 'for i in $(seq 1 100); do curl -s http://demo-app/ > /dev/null; done; echo Done'
-```
-
-Need steady background traffic without a redeploy? Apply the optional traffic generator:
-
-```bash
-kubectl apply -f k8s/demo-app-trafficgen.yaml
-
-# Stop it later
-kubectl delete -f k8s/demo-app-trafficgen.yaml
-```
-
-Open the Grafana dashboard (`grafanaEndpoint` output) to see request rate, CPU, and memory
-respond in real time — side-by-side in ADX and Managed Prometheus.
-
-## Finding Data
-
-### Metrics
-
-**Grafana Explore** — browse all metrics interactively with PromQL or KQL:
-
-```bash
-echo "$(az deployment sub show --name adxmon-deploy -o tsv --query properties.outputs.grafanaEndpoint.value)/explore"
-```
-
-**ADX Web Explorer** — query the Metrics database directly with KQL:
-
-```bash
-az deployment sub show --name adxmon-deploy -o tsv --query properties.outputs.adxWebExplorerUrl.value
-```
-
-### Logs
-
-**Grafana Explore** — same URL as above, select the ADX datasource and switch to the **Logs** database.
-
-**ADX Web Explorer** — query the Logs database directly:
-
-```bash
-az deployment sub show --name adxmon-deploy -o tsv --query properties.outputs.adxLogsExplorerUrl.value
-```
-
-**Log Analytics** (available when Diagnostic Settings or Container Insights is enabled — both are on by default):
-
-```bash
-az deployment sub show --name adxmon-deploy -o tsv --query properties.outputs.logAnalyticsPortalUrl.value
-```
-
-> Container Insights logs land in `ContainerLogV2`, `KubePodInventory`, and `KubeEvents` tables.
-> AKS control-plane logs land in `AzureDiagnostics`.
-
-### Sample KQL Queries
-
-Once in the ADX Web Explorer, try:
-
-```kusto
-// List all metric tables
-.show tables | sort by TableName
-
-// Sample a metric
-ContainerCpuUsageSecondsTotal
-| where Timestamp > ago(5m)
-| take 10
-
-// Counter rate with prom_delta (auto-deployed by adx-mon)
-ContainerCpuUsageSecondsTotal
-| where Timestamp > ago(10m)
-| invoke prom_delta()
-| summarize avg(Value) by Namespace, bin(Timestamp, 1m)
-```
-
-> [`prom_delta()`](https://github.com/Azure/adx-mon) is a KQL function auto-deployed by adx-mon for computing Prometheus counter rates.
 
 ## Collecting Your Application Data
 
