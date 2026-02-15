@@ -54,11 +54,6 @@ param alertOwnerIds = [
 // param adxSkuName = 'Standard_E2ads_v5'
 // param adxSkuCapacity = 2
 
-// Existing AKS cluster (BYO AKS) in the same resource group:
-// Use main.compliant.sample.bicepparam for a fuller template.
-// param createAks = false
-// param existingAksOidcIssuerUrl = 'https://<region>.oic.prod-aks.azure.com/<tenant>/<cluster>/'
-
 // Enable/disable optional integrations (defaults: true)
 // param enableManagedPrometheus = false
 // param enableContainerInsights = false

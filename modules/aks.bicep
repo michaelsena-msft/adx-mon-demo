@@ -10,9 +10,6 @@ param nodeVmSize string = 'Standard_D4s_v3'
 @description('The number of nodes in the system node pool.')
 param nodeCount int = 2
 
-@description('The Kubernetes version for the AKS cluster.')
-param kubernetesVersion string = '1.33'
-
 resource aks 'Microsoft.ContainerService/managedClusters@2024-09-01' = {
   name: clusterName
   location: location
@@ -20,7 +17,7 @@ resource aks 'Microsoft.ContainerService/managedClusters@2024-09-01' = {
     type: 'SystemAssigned'
   }
   properties: {
-    kubernetesVersion: kubernetesVersion
+    kubernetesVersion: '1.33'
     dnsPrefix: clusterName
     enableRBAC: true
     disableLocalAccounts: true
@@ -64,3 +61,4 @@ resource aks 'Microsoft.ContainerService/managedClusters@2024-09-01' = {
 
 @description('The OIDC issuer URL of the AKS cluster.')
 output oidcIssuerUrl string = aks.properties.oidcIssuerProfile.issuerURL
+

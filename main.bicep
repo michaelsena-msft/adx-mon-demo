@@ -1,7 +1,5 @@
 targetScope = 'subscription'
 
-extension microsoftGraphV1
-
 type DashboardDefinition = {
   title: string
   definition: object
@@ -12,22 +10,14 @@ type AlertEmailReceiver = {
   emailAddress: string
 }
 
-// ---------- Parameters ----------
-
 @description('Name of the resource group.')
 param resourceGroupName string = 'rg-adx-mon'
 
 @description('Azure region for all resources.')
 param location string = 'eastus2'
 
-@description('Name of the AKS managed cluster (used for both new and existing clusters).')
+@description('Name of the AKS managed cluster.')
 param aksClusterName string = 'aks-adx-mon'
-
-@description('When false, skip AKS creation and target an existing cluster in the same resource group.')
-param createAks bool = true
-
-@description('OIDC issuer URL of the existing AKS cluster (required when createAks is false).')
-param existingAksOidcIssuerUrl string = ''
 
 @description('Globally unique name for the ADX cluster (lowercase alphanumeric only).')
 @maxLength(22)
@@ -96,48 +86,15 @@ param enableDiagnosticSettings bool = true
 @description('Enable Container Insights for AKS log collection (ContainerLogV2, KubePodInventory, KubeEvents).')
 param enableContainerInsights bool = true
 
-@description('Grafana dashboard definitions to provision. Each entry needs a title and a definition (JSON model object).')
+@description('Additional Grafana dashboard definitions to provision. Each entry needs a title and a definition (JSON model object).')
 param dashboardDefinitions DashboardDefinition[] = []
-
-// ---------- Resolve UPN emails → object IDs via Microsoft Graph ----------
-
-resource users 'Microsoft.Graph/users@v1.0' existing = [for upn in userPrincipalNames: {
-  userPrincipalName: upn
-}]
-
-// Load demo-app dashboard JSON
-var demoAppDashboardJson = loadJsonContent('dashboards/demo-app.json')
-var defaultDashboards = [
-  {
-    title: 'Demo App - adx-mon'
-    definition: demoAppDashboardJson
-  }
-]
-
-// Combine default dashboards with user-provided ones
-var allDashboards = concat(defaultDashboards, dashboardDefinitions)
-
-// Stable resource IDs (avoid conditional module output wiring).
-var aksResourceId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.ContainerService/managedClusters', aksClusterName)
-var azureMonitorWorkspaceResourceId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.Monitor/accounts', azureMonitorWorkspaceName)
-var managedPrometheusDataCollectionEndpointResourceId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.Insights/dataCollectionEndpoints', managedPrometheusDataCollectionEndpointName)
-var logAnalyticsWorkspaceResourceId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.OperationalInsights/workspaces', logAnalyticsWorkspaceName)
-var alertActionGroupResourceId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.Insights/actionGroups', actionGroupName)
-
-// Resolve AKS OIDC issuer URL from module output or param
-#disable-next-line BCP318
-var aksOidcIssuerUrl = createAks ? aks.outputs.oidcIssuerUrl : existingAksOidcIssuerUrl
-
-// ---------- Resource Group ----------
 
 resource rg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
   name: resourceGroupName
   location: location
 }
 
-// ---------- AKS (conditional — skipped when targeting an existing cluster) ----------
-
-module aks 'modules/aks.bicep' = if (createAks) {
+module aks 'modules/aks.bicep' = {
   scope: rg
   name: 'aks-deployment'
   params: {
@@ -148,249 +105,44 @@ module aks 'modules/aks.bicep' = if (createAks) {
   }
 }
 
-// ---------- ADX (parallel with AKS) ----------
+var aksResourceId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.ContainerService/managedClusters', aksClusterName)
 
-module adx 'modules/adx.bicep' = {
+module observability 'observability.bicep' = {
   scope: rg
-  name: 'adx-deployment'
+  name: 'observability-deployment'
   params: {
-    clusterName: adxClusterName
     location: location
-    skuName: adxSkuName
-    skuCapacity: adxSkuCapacity
-  }
-}
-
-// ---------- Identity (needs AKS OIDC URL) ----------
-
-module identity 'modules/identity.bicep' = {
-  scope: rg
-  name: 'identity-deployment'
-  params: {
+    aksClusterResourceId: aksResourceId
+    adxClusterName: adxClusterName
+    grafanaName: grafanaName
     adxMonIdentityName: adxMonIdentityName
     deployerIdentityName: deployerIdentityName
-    location: location
-    aksOidcIssuerUrl: aksOidcIssuerUrl
-    aksClusterName: aksClusterName
-  }
-}
-
-// ---------- Grafana (parallel, with user admin access) ----------
-
-module grafana 'modules/grafana.bicep' = {
-  scope: rg
-  name: 'grafana-deployment'
-  params: {
-    grafanaName: grafanaName
-    location: location
-  }
-}
-
-// ---------- Managed Prometheus (optional, needs AKS and Grafana) ----------
-
-module managedPrometheus 'modules/managed-prometheus.bicep' = if (enableManagedPrometheus) {
-  scope: rg
-  name: 'managed-prometheus-deployment'
-  params: {
-    location: location
-    aksClusterName: aksClusterName
+    logAnalyticsWorkspaceName: logAnalyticsWorkspaceName
     azureMonitorWorkspaceName: azureMonitorWorkspaceName
-    dataCollectionEndpointName: managedPrometheusDataCollectionEndpointName
-    dataCollectionRuleName: managedPrometheusDataCollectionRuleName
-    grafanaPrincipalId: grafana.outputs.grafanaPrincipalId
-    grafanaName: grafana.outputs.grafanaName
-  }
-  dependsOn: [
-    aks
-  ]
-}
-
-// ---------- Prometheus Recording Rules (optional, needs AKS and Managed Prometheus) ----------
-
-module prometheusRules 'modules/prometheus-rules.bicep' = if (enableManagedPrometheus) {
-  scope: rg
-  name: 'prometheus-rules-deployment'
-  params: {
-    location: location
-    azureMonitorWorkspaceId: azureMonitorWorkspaceResourceId
-    aksClusterId: aksResourceId
-    aksClusterName: aksClusterName
-  }
-  dependsOn: [
-    managedPrometheus
-  ]
-}
-
-// ---------- Recommended Metric Alerts (optional, needs AKS and Managed Prometheus) ----------
-
-module actionGroup 'modules/action-group.bicep' = if (enableManagedPrometheus) {
-  scope: rg
-  name: 'action-group-deployment'
-  params: {
+    managedPrometheusDataCollectionEndpointName: managedPrometheusDataCollectionEndpointName
+    managedPrometheusDataCollectionRuleName: managedPrometheusDataCollectionRuleName
+    containerInsightsDataCollectionEndpointName: containerInsightsDataCollectionEndpointName
+    containerInsightsDataCollectionRuleName: containerInsightsDataCollectionRuleName
+    adxSkuName: adxSkuName
+    adxSkuCapacity: adxSkuCapacity
+    userPrincipalNames: userPrincipalNames
+    forceScriptRerun: forceScriptRerun
+    enableManagedPrometheus: enableManagedPrometheus
     actionGroupName: actionGroupName
-    emailReceivers: alertEmailReceivers
-  }
-}
-
-module recommendedMetricAlerts 'modules/recommended-metric-alerts.bicep' = if (enableManagedPrometheus) {
-  scope: rg
-  name: 'recommended-metric-alerts-deployment'
-  params: {
-    location: location
-    aksClusterId: aksResourceId
-    azureMonitorWorkspaceId: azureMonitorWorkspaceResourceId
-    actionGroupResourceId: alertActionGroupResourceId
-  }
-  dependsOn: [
-    managedPrometheus
-    actionGroup
-  ]
-}
-
-// ---------- Simple Custom Prometheus Alert Demo ----------
-
-module simplePrometheusAlert 'modules/simple-prometheus-alert.bicep' = if (enableManagedPrometheus) {
-  scope: rg
-  name: 'simple-prometheus-alert-deployment'
-  params: {
-    location: location
-    aksClusterId: aksResourceId
-    aksClusterName: aksClusterName
-    azureMonitorWorkspaceId: azureMonitorWorkspaceResourceId
-    actionGroupResourceId: alertActionGroupResourceId
+    alertEmailReceivers: alertEmailReceivers
     alertOwnerIds: alertOwnerIds
+    enableDiagnosticSettings: enableDiagnosticSettings
+    enableContainerInsights: enableContainerInsights
+    dashboardDefinitions: dashboardDefinitions
   }
   dependsOn: [
-    recommendedMetricAlerts
-  ]
-}
-
-// ---------- Log Analytics Workspace (shared by Diagnostic Settings and Container Insights) ----------
-
-var needsLaw = enableDiagnosticSettings || enableContainerInsights
-
-module logAnalytics 'modules/log-analytics.bicep' = if (needsLaw) {
-  scope: rg
-  name: 'log-analytics-deployment'
-  params: {
-    location: location
-    workspaceName: logAnalyticsWorkspaceName
-  }
-}
-
-// ---------- Diagnostic Settings (optional, needs AKS + LAW) ----------
-
-module diagnosticSettings 'modules/diagnostic-settings.bicep' = if (enableDiagnosticSettings) {
-  scope: rg
-  name: 'diagnostic-settings-deployment'
-  params: {
-    aksClusterName: aksClusterName
-    logAnalyticsWorkspaceId: logAnalyticsWorkspaceResourceId
-  }
-  dependsOn: [
-    logAnalytics
     aks
   ]
 }
-
-// ---------- Container Insights (optional, needs AKS + LAW + Grafana; after MP to avoid AKS conflict) ----------
-
-module containerInsightsWithManagedPrometheus 'modules/container-insights.bicep' = if (enableContainerInsights && enableManagedPrometheus) {
-  scope: rg
-  name: 'container-insights-deployment-mp'
-  params: {
-    aksClusterName: aksClusterName
-    location: location
-    dataCollectionEndpointName: containerInsightsDataCollectionEndpointName
-    dataCollectionRuleName: containerInsightsDataCollectionRuleName
-    logAnalyticsWorkspaceId: logAnalyticsWorkspaceResourceId
-    grafanaPrincipalId: grafana.outputs.grafanaPrincipalId
-    existingDataCollectionEndpointId: managedPrometheusDataCollectionEndpointResourceId
-  }
-  dependsOn: [
-    logAnalytics
-    managedPrometheus
-    diagnosticSettings
-  ]
-}
-
-module containerInsightsWithoutManagedPrometheus 'modules/container-insights.bicep' = if (enableContainerInsights && !enableManagedPrometheus) {
-  scope: rg
-  name: 'container-insights-deployment'
-  params: {
-    aksClusterName: aksClusterName
-    location: location
-    dataCollectionEndpointName: containerInsightsDataCollectionEndpointName
-    dataCollectionRuleName: containerInsightsDataCollectionRuleName
-    logAnalyticsWorkspaceId: logAnalyticsWorkspaceResourceId
-    grafanaPrincipalId: grafana.outputs.grafanaPrincipalId
-    existingDataCollectionEndpointId: ''
-  }
-  dependsOn: [
-    logAnalytics
-    aks
-    diagnosticSettings
-  ]
-}
-
-// ---------- Role Assignments (needs ADX, identity, grafana) ----------
-
-module roleAssignments 'modules/role-assignments.bicep' = {
-  scope: rg
-  name: 'role-assignments-deployment'
-  params: {
-    adxClusterName: adx.outputs.adxName
-    adxMonAppId: identity.outputs.adxMonIdentityClientId
-    grafanaPrincipalId: grafana.outputs.grafanaPrincipalId
-    grafanaName: grafana.outputs.grafanaName
-    viewerPrincipalIds: [for (upn, i) in userPrincipalNames: users[i].id]
-  }
-}
-
-// ---------- K8s Workloads (needs AKS, ADX, identity, roleAssignments) ----------
-
-module k8sWorkloads 'modules/k8s-workloads.bicep' = {
-  scope: rg
-  name: 'k8s-workloads-deployment'
-  params: {
-    location: location
-    aksClusterName: aksClusterName
-    adxUri: adx.outputs.adxUri
-    adxMonClientId: identity.outputs.adxMonIdentityClientId
-    clusterName: aksClusterName
-    region: location
-    deployerIdentityId: identity.outputs.deployerIdentityId
-    forceScriptRerun: forceScriptRerun
-  }
-}
-
-// ---------- Grafana Config — datasource + optional dashboards ----------
-
-module grafanaConfig 'modules/grafana-config.bicep' = {
-  scope: rg
-  name: 'grafana-config-deployment'
-  params: {
-    location: location
-    grafanaName: grafana.outputs.grafanaName
-    adxUri: adx.outputs.adxUri
-    adxClusterName: adx.outputs.adxName
-    deployerIdentityId: identity.outputs.deployerIdentityId
-    deployerPrincipalId: identity.outputs.deployerPrincipalId
-    forceScriptRerun: forceScriptRerun
-    dashboardDefinitions: allDashboards
-  }
-}
-
-// ---------- Outputs ----------
 
 output aksClusterName string = aksClusterName
-output adxWebExplorerUrl string = 'https://dataexplorer.azure.com/clusters/${replace(adx.outputs.adxUri, 'https://', '')}'
-output grafanaEndpoint string = grafana.outputs.grafanaEndpoint
-output azureMonitorWorkspaceId string = enableManagedPrometheus ? azureMonitorWorkspaceResourceId : ''
-output logAnalyticsPortalUrl string = needsLaw ? 'https://portal.azure.com/#@${tenant().tenantId}/resource${logAnalyticsWorkspaceResourceId}/logs' : ''
-output azureMonitorAlertPortalUrls array = enableManagedPrometheus ? [
-  'https://portal.azure.com/#@${tenant().tenantId}/resource/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroupName}/providers/Microsoft.AlertsManagement/prometheusRuleGroups/KubernetesAlert-RecommendedMetricAlerts${aksClusterName}-Cluster-level/overview'
-  'https://portal.azure.com/#@${tenant().tenantId}/resource/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroupName}/providers/Microsoft.AlertsManagement/prometheusRuleGroups/KubernetesAlert-RecommendedMetricAlerts${aksClusterName}-Node-level/overview'
-  'https://portal.azure.com/#@${tenant().tenantId}/resource/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroupName}/providers/Microsoft.AlertsManagement/prometheusRuleGroups/KubernetesAlert-RecommendedMetricAlerts${aksClusterName}-Pod-level/overview'
-  'https://portal.azure.com/#@${tenant().tenantId}/resource/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroupName}/providers/Microsoft.AlertsManagement/prometheusRuleGroups/DemoCustomAlertsRuleGroup-${aksClusterName}/overview'
-] : []
+output adxWebExplorerUrl string = observability.outputs.adxWebExplorerUrl
+output grafanaEndpoint string = observability.outputs.grafanaEndpoint
+output azureMonitorWorkspaceId string = observability.outputs.azureMonitorWorkspaceId
+output logAnalyticsPortalUrl string = observability.outputs.logAnalyticsPortalUrl
+output azureMonitorAlertPortalUrls array = observability.outputs.azureMonitorAlertPortalUrls

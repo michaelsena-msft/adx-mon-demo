@@ -13,12 +13,6 @@ param adxUri string
 @description('Client ID of the adx-mon managed identity')
 param adxMonClientId string
 
-@description('Logical name for the AKS cluster (used in telemetry labels)')
-param clusterName string
-
-@description('Azure region value for collector config')
-param region string
-
 @description('Resource ID of the deployer managed identity for the deployment script')
 param deployerIdentityId string
 
@@ -54,8 +48,8 @@ resource applyK8sManifests 'Microsoft.Resources/deploymentScripts@2023-08-01' = 
       { name: 'AKS_RG', value: resourceGroup().name }
       { name: 'ADX_URL', value: adxUri }
       { name: 'CLIENT_ID', value: adxMonClientId }
-      { name: 'CLUSTER_NAME', value: clusterName }
-      { name: 'REGION', value: region }
+      { name: 'CLUSTER_NAME', value: aksClusterName }
+      { name: 'REGION', value: location }
       { name: 'CRDS_YAML', value: crdsYaml }
       { name: 'INGESTOR_YAML', value: ingestorYaml }
       { name: 'COLLECTOR_YAML', value: collectorYaml }

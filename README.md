@@ -67,9 +67,9 @@ Use **ADX/Kusto pathway** when describing the ADX data path. Use **adx-mon** for
 
 ## Bicep Module Graph
 
-`main.bicep` orchestrates the resource-group-scoped modules below. **Solid lines** = always deployed.
+`main.bicep` is the vanilla entrypoint (creates resource group + AKS), then invokes `observability.bicep`.
+`observability.bicep` orchestrates the resource-group-scoped modules below. **Solid lines** = always deployed.
 **Dashed lines** = conditionally deployed (enabled by default, can be disabled).
-AKS, ADX, and Grafana deploy in parallel; downstream modules wait for their dependencies.
 
 ```mermaid
 flowchart TD
@@ -117,6 +117,11 @@ flowchart TD
 - [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) with [Bicep](https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/overview) (`az bicep install`)
 - An Azure subscription with **Contributor** access
 
+### Entry points
+
+- `main.bicep` (subscription scope): creates the resource group, creates AKS, then deploys the full observability stack.
+- `observability.bicep` (resource-group scope): deploys observability components onto an existing AKS cluster using `aksClusterResourceId`.
+
 ### 1. Configure Parameters
 
 ```bash
@@ -157,6 +162,18 @@ az deployment sub create \
   --template-file main.bicep \
   --parameters main.bicepparam \
   --name adxmon-deploy
+```
+
+Existing AKS attach-only flow:
+
+```bash
+az deployment group create \
+  --resource-group <resource-group-name> \
+  --template-file observability.bicep \
+  --parameters aksClusterResourceId=<aks-resource-id> \
+  --parameters alertEmailReceivers='[{\"name\":\"primary\",\"emailAddress\":\"you@contoso.com\"}]' \
+  --parameters alertOwnerIds='[\"youralias\"]' \
+  --name adxmon-observability-deploy
 ```
 
 Deployment takes **~15 minutes** on a fresh deploy (ADX cluster provisioning is the bottleneck).
