@@ -74,40 +74,48 @@ Use **ADX/Kusto pathway** when describing the ADX data path. Use **adx-mon** for
 ```mermaid
 flowchart TD
     main["main.bicep\n(subscription scope)"]
+    obs["observability.bicep\n(resource group scope)"]
 
     main --> aks["aks.bicep\nAKS + ACNS"]
-    main --> adx["adx.bicep\nADX + Databases"]
-    main --> grafana["grafana.bicep\nManaged Grafana"]
+    main --> obs
+    obs --> grafana["grafana.bicep\nManaged Grafana"]
 
-    aks --> identity["identity.bicep\nManaged Identities"]
+    obs --> adx["modules/adx/cluster.bicep\nADX + Databases"]
+    obs --> identity["modules/adx/identity.bicep\nadx-mon + AKS script identity"]
 
-    adx & identity & grafana --> roles["role-assignments.bicep\nADX + Grafana RBAC"]
+    adx & identity & grafana --> adxRbac["modules/adx/rbac.bicep\nADX DB RBAC"]
 
-    aks & adx & identity --> k8s["k8s-workloads.bicep\nadx-mon + demo-app"]
+    aks & adx & identity --> k8s["modules/adx/workloads.bicep\nadx-mon + demo-app"]
 
-    grafana & adx & identity --> gconfig["grafana-config.bicep\nDatasources + Dashboards"]
+    obs --> gconfigId["modules/grafana/config-deployer-identity.bicep\nGrafana config identity"]
+    grafana & adx & gconfigId --> gconfig["modules/grafana/bind-adx-datasource.bicep\nADX datasource + dashboards"]
+    grafana --> gadmins["modules/grafana/admin-rbac-users.bicep\nGrafana Admin users"]
 
     %% Managed Prometheus + alerts (optional)
-    main -.-> mp["managed-prometheus.bicep\nAMW + DCE/DCR/DCRA"]
-    mp & aks -.-> rules["prometheus-rules.bicep\nRecording rules"]
-    main -.-> ag["action-group.bicep\nAction Group"]
-    mp & aks & ag -.-> recAlerts["recommended-metric-alerts.bicep\nRecommended alerts"]
-    mp & aks & ag -.-> demoAlert["simple-prometheus-alert.bicep\nDemo Prometheus alert"]
+    obs -.-> mp["modules/azure-monitor/managed-prometheus.bicep\nAMW + DCE/DCR/DCRA"]
+    mp & aks -.-> rules["modules/azure-monitor/prometheus-rules.bicep\nRecording rules"]
+    obs -.-> ag["modules/azure-monitor/action-group.bicep\nAction Group"]
+    mp & aks & ag -.-> recAlerts["modules/azure-monitor/recommended-metric-alerts.bicep\nRecommended alerts"]
+    mp & aks & ag -.-> demoAlert["modules/azure-monitor/simple-prometheus-alert.bicep\nDemo Prometheus alert"]
+    obs -.-> amwBind["modules/grafana/bind-amw.bicep\nGrafana AMW link + RBAC"]
 
     %% Logs (optional)
-    main -.-> law["log-analytics.bicep\nLog Analytics"]
-    law & aks -.-> diag["diagnostic-settings.bicep\nControl-plane logs"]
-    law & aks & grafana -.-> ci["container-insights.bicep\nContainer logs + inventory"]
+    obs -.-> law["modules/azure-monitor/log-analytics.bicep\nLog Analytics"]
+    law & aks -.-> diag["modules/azure-monitor/diagnostic-settings.bicep\nControl-plane logs"]
+    law & aks -.-> ci["modules/azure-monitor/container-insights.bicep\nContainer logs + inventory"]
     mp -.->|shares DCE| ci
+    obs -.-> lawBind["modules/grafana/bind-law.bicep\nGrafana LAW RBAC"]
 
     style mp fill:#f0e6ff,stroke:#7b2ff7,stroke-dasharray: 5 5
     style rules fill:#f0e6ff,stroke:#7b2ff7,stroke-dasharray: 5 5
     style ag fill:#f0e6ff,stroke:#7b2ff7,stroke-dasharray: 5 5
     style recAlerts fill:#f0e6ff,stroke:#7b2ff7,stroke-dasharray: 5 5
     style demoAlert fill:#f0e6ff,stroke:#7b2ff7,stroke-dasharray: 5 5
+    style amwBind fill:#f0e6ff,stroke:#7b2ff7,stroke-dasharray: 5 5
     style law fill:#e8f0fe,stroke:#1a73e8,stroke-dasharray: 5 5
     style diag fill:#e8f0fe,stroke:#1a73e8,stroke-dasharray: 5 5
     style ci fill:#e8f0fe,stroke:#1a73e8,stroke-dasharray: 5 5
+    style lawBind fill:#e8f0fe,stroke:#1a73e8,stroke-dasharray: 5 5
 ```
 
 ## Quick Start
@@ -270,7 +278,7 @@ When enabled, Bicep deploys an [Azure Monitor Workspace (AMW)](https://learn.mic
 [data-collection endpoint/rule](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/data-collection-rule-overview), links the AMW to Grafana,
 and creates [Prometheus recording rule groups](https://learn.microsoft.com/azure/azure-monitor/containers/prometheus-metrics-scrape-default#recording-rules)
 required by the auto-provisioned Kubernetes Compute dashboards.
-See `modules/prometheus-rules.bicep` for details on why these are declared explicitly.
+See `modules/azure-monitor/prometheus-rules.bicep` for details on why these are declared explicitly.
 
 This deployment also enables Azure Monitor [recommended AKS metric alerts](https://learn.microsoft.com/en-us/azure/azure-monitor/containers/kubernetes-metric-alerts)
 using Microsoft's published template and adds one simple custom Prometheus alert rule group as an example.
@@ -340,7 +348,7 @@ enables the `omsagent` AKS addon (which deploys `ama-logs` DaemonSet pods), and 
 | `KubeEvents` | Kubernetes events (scheduled, pulled, started, killed) |
 
 **Namespace filtering**: `kube-system` is excluded to reduce noise. To capture specific `kube-system` workloads
-(e.g., coredns), adjust the DCR's `namespaceFilteringMode` in `modules/container-insights.bicep`.
+(e.g., coredns), adjust the DCR's `namespaceFilteringMode` in `modules/azure-monitor/container-insights.bicep`.
 
 See [COMPARISONS.md](COMPARISONS.md) for a 3-way coverage comparison.
 

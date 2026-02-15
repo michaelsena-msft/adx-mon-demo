@@ -29,8 +29,11 @@ param grafanaName string = 'grafana-adx-mon'
 @description('Name of the adx-mon workload identity.')
 param adxMonIdentityName string = 'id-adx-mon'
 
-@description('Name of the deployer managed identity for deployment scripts.')
-param deployerIdentityName string = 'id-adx-mon-deployer'
+@description('Name of the AKS script deployer managed identity for deployment scripts.')
+param aksScriptDeployerIdentityName string = 'id-adx-mon-aks-deployer'
+
+@description('Name of the Grafana config deployer managed identity for deployment scripts.')
+param grafanaConfigDeployerIdentityName string = 'id-adx-mon-grafana-deployer'
 
 @description('Name of the Log Analytics workspace.')
 param logAnalyticsWorkspaceName string = 'law-adx-mon'
@@ -116,7 +119,8 @@ module observability 'observability.bicep' = {
     adxClusterName: adxClusterName
     grafanaName: grafanaName
     adxMonIdentityName: adxMonIdentityName
-    deployerIdentityName: deployerIdentityName
+    aksScriptDeployerIdentityName: aksScriptDeployerIdentityName
+    grafanaConfigDeployerIdentityName: grafanaConfigDeployerIdentityName
     logAnalyticsWorkspaceName: logAnalyticsWorkspaceName
     azureMonitorWorkspaceName: azureMonitorWorkspaceName
     managedPrometheusDataCollectionEndpointName: managedPrometheusDataCollectionEndpointName

@@ -13,20 +13,20 @@ param adxUri string
 @description('Client ID of the adx-mon managed identity')
 param adxMonClientId string
 
-@description('Resource ID of the deployer managed identity for the deployment script')
-param deployerIdentityId string
+@description('Resource ID of the AKS script deployer managed identity for the deployment script')
+param aksScriptDeployerIdentityId string
 
 @description('Set to any unique value to force the deployment script to re-execute. Leave empty for normal behavior.')
 param forceScriptRerun string = ''
 
-var crdsYaml = loadTextContent('../k8s/crds.yaml')
-var ingestorYaml = loadTextContent('../k8s/ingestor.yaml')
-var collectorYaml = loadTextContent('../k8s/collector.yaml')
-var ksmYaml = loadTextContent('../k8s/ksm.yaml')
-var functionsYaml = loadTextContent('../k8s/functions.yaml')
-var alertruleYaml = loadTextContent('../k8s/sample-alertrule.yaml')
-var demoAppYaml = loadTextContent('../k8s/demo-app.yaml')
-var amaMetricsSettingsYaml = loadTextContent('../k8s/ama-metrics-settings.yaml')
+var crdsYaml = loadTextContent('../../k8s/crds.yaml')
+var ingestorYaml = loadTextContent('../../k8s/ingestor.yaml')
+var collectorYaml = loadTextContent('../../k8s/collector.yaml')
+var ksmYaml = loadTextContent('../../k8s/ksm.yaml')
+var functionsYaml = loadTextContent('../../k8s/functions.yaml')
+var alertruleYaml = loadTextContent('../../k8s/sample-alertrule.yaml')
+var demoAppYaml = loadTextContent('../../k8s/demo-app.yaml')
+var amaMetricsSettingsYaml = loadTextContent('../../k8s/ama-metrics-settings.yaml')
 
 resource applyK8sManifests 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
   name: 'apply-k8s-manifests'
@@ -35,7 +35,7 @@ resource applyK8sManifests 'Microsoft.Resources/deploymentScripts@2023-08-01' = 
   identity: {
     type: 'UserAssigned'
     userAssignedIdentities: {
-      '${deployerIdentityId}': {}
+      '${aksScriptDeployerIdentityId}': {}
     }
   }
   properties: {

@@ -13,14 +13,6 @@ param dataCollectionEndpointName string
 @description('Name of the Data Collection Rule for Prometheus.')
 param dataCollectionRuleName string
 
-@description('Principal ID of the Grafana managed identity to grant Monitoring Reader.')
-param grafanaPrincipalId string
-
-@description('Name of the existing Grafana workspace to link to the Azure Monitor Workspace.')
-param grafanaName string
-
-var monitoringReaderRoleId = '43d0d8ad-25c7-4714-9337-8ba259a9fe05'
-
 resource amw 'Microsoft.Monitor/accounts@2023-04-03' = {
   name: azureMonitorWorkspaceName
   location: location
@@ -109,30 +101,5 @@ resource aksMetricsUpdate 'Microsoft.ContainerService/managedClusters@2024-09-01
   }
 }
 
-resource grafanaMonitoringReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(amw.id, grafanaPrincipalId, monitoringReaderRoleId)
-  scope: amw
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', monitoringReaderRoleId)
-    principalId: grafanaPrincipalId
-    principalType: 'ServicePrincipal'
-  }
-}
-
-resource grafanaAmwLink 'Microsoft.Dashboard/grafana@2024-10-01' = {
-  name: grafanaName
-  location: location
-  sku: {
-    name: 'Standard'
-  }
-  properties: {
-    grafanaIntegrations: {
-      azureMonitorWorkspaceIntegrations: [
-        {
-          azureMonitorWorkspaceResourceId: amw.id
-        }
-      ]
-    }
-  }
-}
-
+output azureMonitorWorkspaceId string = amw.id
+output dataCollectionEndpointId string = dce.id

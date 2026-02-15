@@ -1,8 +1,8 @@
 @description('Name of the adx-mon workload identity.')
 param adxMonIdentityName string
 
-@description('Name of the deployer managed identity for deployment scripts.')
-param deployerIdentityName string
+@description('Name of the AKS script deployer managed identity.')
+param aksScriptDeployerIdentityName string
 
 @description('Azure region for all resources.')
 param location string
@@ -12,6 +12,10 @@ param aksOidcIssuerUrl string
 
 @description('Name of the AKS cluster for scoped role assignments.')
 param aksClusterName string
+
+resource aksCluster 'Microsoft.ContainerService/managedClusters@2024-09-01' existing = {
+  name: aksClusterName
+}
 
 // User-Assigned Managed Identity for adx-mon workloads
 resource adxMonIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
@@ -48,19 +52,19 @@ resource federatedCollector 'Microsoft.ManagedIdentity/userAssignedIdentities/fe
   }
 }
 
-// User-Assigned Managed Identity for deployment scripts
-resource deployerIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
-  name: deployerIdentityName
+// User-Assigned Managed Identity for AKS deployment scripts
+resource aksScriptDeployerIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
+  name: aksScriptDeployerIdentityName
   location: location
 }
 
 // Give the deployer identity "Azure Kubernetes Service Cluster Admin Role" on the AKS cluster
 resource aksClusterAdminRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(aksCluster.id, deployerIdentity.id, '0ab0b1a8-8aac-4efd-b8c2-3ee1fb270be8')
+  name: guid(aksCluster.id, aksScriptDeployerIdentity.id, '0ab0b1a8-8aac-4efd-b8c2-3ee1fb270be8')
   scope: aksCluster
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '0ab0b1a8-8aac-4efd-b8c2-3ee1fb270be8')
-    principalId: deployerIdentity.properties.principalId
+    principalId: aksScriptDeployerIdentity.properties.principalId
     principalType: 'ServicePrincipal'
   }
 }
@@ -68,30 +72,25 @@ resource aksClusterAdminRole 'Microsoft.Authorization/roleAssignments@2022-04-01
 // Give the deployer identity "Azure Kubernetes Service RBAC Cluster Admin" on the AKS cluster
 // Required for clusters with Azure RBAC enabled (disableLocalAccounts: true)
 resource aksRbacClusterAdminRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(aksCluster.id, deployerIdentity.id, 'b1ff04bb-8a4e-4dc4-8eb5-8693973ce19b')
+  name: guid(aksCluster.id, aksScriptDeployerIdentity.id, 'b1ff04bb-8a4e-4dc4-8eb5-8693973ce19b')
   scope: aksCluster
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b1ff04bb-8a4e-4dc4-8eb5-8693973ce19b')
-    principalId: deployerIdentity.properties.principalId
+    principalId: aksScriptDeployerIdentity.properties.principalId
     principalType: 'ServicePrincipal'
   }
 }
 
-// Reference the existing AKS cluster for scoped role assignment
-resource aksCluster 'Microsoft.ContainerService/managedClusters@2024-09-01' existing = {
-  name: aksClusterName
-}
-
 // Give the deployer identity "Contributor" on the resource group
 resource rgContributorRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(resourceGroup().id, deployerIdentity.id, 'b24988ac-6180-42a0-ab88-20f7382dd24c')
+  name: guid(resourceGroup().id, aksScriptDeployerIdentity.id, 'b24988ac-6180-42a0-ab88-20f7382dd24c')
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b24988ac-6180-42a0-ab88-20f7382dd24c')
-    principalId: deployerIdentity.properties.principalId
+    principalId: aksScriptDeployerIdentity.properties.principalId
     principalType: 'ServicePrincipal'
   }
 }
 
 output adxMonIdentityClientId string = adxMonIdentity.properties.clientId
-output deployerIdentityId string = deployerIdentity.id
-output deployerPrincipalId string = deployerIdentity.properties.principalId
+output aksScriptDeployerIdentityId string = aksScriptDeployerIdentity.id
+output aksScriptDeployerPrincipalId string = aksScriptDeployerIdentity.properties.principalId

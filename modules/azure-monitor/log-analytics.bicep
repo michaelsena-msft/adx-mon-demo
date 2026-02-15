@@ -14,4 +14,3 @@ resource law 'Microsoft.OperationalInsights/workspaces@2025-02-01' = {
     }
   }
 }
-

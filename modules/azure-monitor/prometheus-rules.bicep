@@ -25,7 +25,7 @@
 // The source mixin definitions are published at:
 //   https://aka.ms/azureprometheus-mixins
 //
-// The JSON files in ../rules/ were exported from a working CLI-provisioned
+// The JSON files in ../../rules/ were exported from a working CLI-provisioned
 // cluster in the same subscription and contain no custom modifications.
 // ---------------------------------------------------------------------------
 
@@ -41,9 +41,9 @@ param aksClusterId string
 @description('Name of the AKS cluster (used in rule group naming).')
 param aksClusterName string
 
-var nodeRules = loadJsonContent('../rules/node-recording-rules.json')
-var kubernetesRules = loadJsonContent('../rules/kubernetes-recording-rules.json')
-var uxRules = loadJsonContent('../rules/ux-recording-rules.json')
+var nodeRules = loadJsonContent('../../rules/node-recording-rules.json')
+var kubernetesRules = loadJsonContent('../../rules/kubernetes-recording-rules.json')
+var uxRules = loadJsonContent('../../rules/ux-recording-rules.json')
 
 resource nodeRecordingRules 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-03-01' = {
   name: 'NodeRecordingRulesRuleGroup-${aksClusterName}'

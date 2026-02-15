@@ -7,10 +7,7 @@ param adxMonAppId string
 @description('Principal ID of the Grafana managed identity.')
 param grafanaPrincipalId string
 
-@description('Name of the Grafana workspace (for admin role assignments).')
-param grafanaName string
-
-@description('User principal IDs to grant ADX Viewer and Grafana Admin access')
+@description('User principal IDs to grant ADX Viewer access.')
 param viewerPrincipalIds string[] = []
 
 resource adx 'Microsoft.Kusto/clusters@2024-04-13' existing = {
@@ -71,7 +68,7 @@ resource grafanaLogsViewer 'Microsoft.Kusto/clusters/databases/principalAssignme
   }
 }
 
-resource userMetricsViewer 'Microsoft.Kusto/clusters/databases/principalAssignments@2024-04-13' = [for (principalId, i) in viewerPrincipalIds: {
+resource userMetricsViewer 'Microsoft.Kusto/clusters/databases/principalAssignments@2024-04-13' = [for principalId in viewerPrincipalIds: {
   parent: metricsDb
   name: guid(metricsDb.id, principalId, 'Viewer')
   properties: {
@@ -82,7 +79,7 @@ resource userMetricsViewer 'Microsoft.Kusto/clusters/databases/principalAssignme
   }
 }]
 
-resource userLogsViewer 'Microsoft.Kusto/clusters/databases/principalAssignments@2024-04-13' = [for (principalId, i) in viewerPrincipalIds: {
+resource userLogsViewer 'Microsoft.Kusto/clusters/databases/principalAssignments@2024-04-13' = [for principalId in viewerPrincipalIds: {
   parent: logsDb
   name: guid(logsDb.id, principalId, 'Viewer')
   properties: {
@@ -90,21 +87,5 @@ resource userLogsViewer 'Microsoft.Kusto/clusters/databases/principalAssignments
     principalType: 'User'
     role: 'Viewer'
     tenantId: tenant().tenantId
-  }
-}]
-
-// ---------- Grafana Admin role for user principals ----------
-
-resource grafana 'Microsoft.Dashboard/grafana@2024-10-01' existing = {
-  name: grafanaName
-}
-
-resource grafanaAdminRoles 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for (principalId, i) in viewerPrincipalIds: {
-  name: guid(grafana.id, principalId, '22926164-76b3-42b3-bc55-97df8dab3e41')
-  scope: grafana
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '22926164-76b3-42b3-bc55-97df8dab3e41')
-    principalId: principalId
-    principalType: 'User'
   }
 }]

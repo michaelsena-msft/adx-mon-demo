@@ -7,9 +7,6 @@ param location string
 @description('Resource ID of the Log Analytics workspace for Container Insights data.')
 param logAnalyticsWorkspaceId string
 
-@description('Principal ID of the Grafana managed identity to grant Monitoring Reader on LAW.')
-param grafanaPrincipalId string
-
 @description('Existing Data Collection Endpoint ID (e.g. from Managed Prometheus). If empty, a new DCE is created.')
 param existingDataCollectionEndpointId string = ''
 
@@ -19,7 +16,6 @@ param dataCollectionEndpointName string
 @description('Name of the Data Collection Rule for Container Insights.')
 param dataCollectionRuleName string
 
-var monitoringReaderRoleId = '43d0d8ad-25c7-4714-9337-8ba259a9fe05'
 var createDce = empty(existingDataCollectionEndpointId)
 var effectiveDceId = createDce ? dce.id : existingDataCollectionEndpointId
 
@@ -123,12 +119,4 @@ resource aksMonitoringUpdate 'Microsoft.ContainerService/managedClusters@2024-09
   }
 }
 
-// Grant Grafana Monitoring Reader on the LAW so it can query CI tables
-resource grafanaLawReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(logAnalyticsWorkspaceId, grafanaPrincipalId, monitoringReaderRoleId)
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', monitoringReaderRoleId)
-    principalId: grafanaPrincipalId
-    principalType: 'ServicePrincipal'
-  }
-}
+output dataCollectionEndpointId string = effectiveDceId

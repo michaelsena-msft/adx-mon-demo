@@ -28,8 +28,11 @@ param grafanaName string = 'grafana-adx-mon'
 @description('Name of the adx-mon workload identity.')
 param adxMonIdentityName string = 'id-adx-mon'
 
-@description('Name of the deployer managed identity for deployment scripts.')
-param deployerIdentityName string = 'id-adx-mon-deployer'
+@description('Name of the AKS script deployer managed identity for deployment scripts.')
+param aksScriptDeployerIdentityName string = 'id-adx-mon-aks-deployer'
+
+@description('Name of the Grafana config deployer managed identity for deployment scripts.')
+param grafanaConfigDeployerIdentityName string = 'id-adx-mon-grafana-deployer'
 
 @description('Name of the Log Analytics workspace.')
 param logAnalyticsWorkspaceName string = 'law-adx-mon'
@@ -106,8 +109,9 @@ var managedPrometheusDataCollectionEndpointResourceId = resourceId('Microsoft.In
 var logAnalyticsWorkspaceResourceId = resourceId('Microsoft.OperationalInsights/workspaces', logAnalyticsWorkspaceName)
 var alertActionGroupResourceId = resourceId('Microsoft.Insights/actionGroups', actionGroupName)
 var aksOidcIssuerUrl = aksCluster.properties.oidcIssuerProfile.issuerURL
+var needsLaw = enableDiagnosticSettings || enableContainerInsights
 
-module adx 'modules/adx.bicep' = {
+module adx 'modules/adx/cluster.bicep' = {
   name: 'adx-deployment'
   params: {
     clusterName: adxClusterName
@@ -117,11 +121,11 @@ module adx 'modules/adx.bicep' = {
   }
 }
 
-module identity 'modules/identity.bicep' = {
-  name: 'identity-deployment'
+module adxIdentity 'modules/adx/identity.bicep' = {
+  name: 'adx-identity-deployment'
   params: {
     adxMonIdentityName: adxMonIdentityName
-    deployerIdentityName: deployerIdentityName
+    aksScriptDeployerIdentityName: aksScriptDeployerIdentityName
     location: location
     aksOidcIssuerUrl: aksOidcIssuerUrl
     aksClusterName: aksClusterName
@@ -136,7 +140,15 @@ module grafana 'modules/grafana.bicep' = {
   }
 }
 
-module managedPrometheus 'modules/managed-prometheus.bicep' = if (enableManagedPrometheus) {
+module grafanaConfigDeployerIdentity 'modules/grafana/config-deployer-identity.bicep' = {
+  name: 'grafana-config-deployer-identity-deployment'
+  params: {
+    grafanaConfigDeployerIdentityName: grafanaConfigDeployerIdentityName
+    location: location
+  }
+}
+
+module managedPrometheus 'modules/azure-monitor/managed-prometheus.bicep' = if (enableManagedPrometheus) {
   name: 'managed-prometheus-deployment'
   params: {
     location: location
@@ -144,12 +156,23 @@ module managedPrometheus 'modules/managed-prometheus.bicep' = if (enableManagedP
     azureMonitorWorkspaceName: azureMonitorWorkspaceName
     dataCollectionEndpointName: managedPrometheusDataCollectionEndpointName
     dataCollectionRuleName: managedPrometheusDataCollectionRuleName
-    grafanaPrincipalId: grafana.outputs.grafanaPrincipalId
-    grafanaName: grafana.outputs.grafanaName
   }
 }
 
-module prometheusRules 'modules/prometheus-rules.bicep' = if (enableManagedPrometheus) {
+module grafanaBindAmw 'modules/grafana/bind-amw.bicep' = if (enableManagedPrometheus) {
+  name: 'grafana-bind-amw-deployment'
+  params: {
+    location: location
+    grafanaName: grafana.outputs.grafanaName
+    grafanaPrincipalId: grafana.outputs.grafanaPrincipalId
+    azureMonitorWorkspaceName: azureMonitorWorkspaceName
+  }
+  dependsOn: [
+    managedPrometheus
+  ]
+}
+
+module prometheusRules 'modules/azure-monitor/prometheus-rules.bicep' = if (enableManagedPrometheus) {
   name: 'prometheus-rules-deployment'
   params: {
     location: location
@@ -162,7 +185,7 @@ module prometheusRules 'modules/prometheus-rules.bicep' = if (enableManagedProme
   ]
 }
 
-module actionGroup 'modules/action-group.bicep' = if (enableManagedPrometheus) {
+module actionGroup 'modules/azure-monitor/action-group.bicep' = if (enableManagedPrometheus) {
   name: 'action-group-deployment'
   params: {
     actionGroupName: actionGroupName
@@ -170,7 +193,7 @@ module actionGroup 'modules/action-group.bicep' = if (enableManagedPrometheus) {
   }
 }
 
-module recommendedMetricAlerts 'modules/recommended-metric-alerts.bicep' = if (enableManagedPrometheus) {
+module recommendedMetricAlerts 'modules/azure-monitor/recommended-metric-alerts.bicep' = if (enableManagedPrometheus) {
   name: 'recommended-metric-alerts-deployment'
   params: {
     location: location
@@ -184,7 +207,7 @@ module recommendedMetricAlerts 'modules/recommended-metric-alerts.bicep' = if (e
   ]
 }
 
-module simplePrometheusAlert 'modules/simple-prometheus-alert.bicep' = if (enableManagedPrometheus) {
+module simplePrometheusAlert 'modules/azure-monitor/simple-prometheus-alert.bicep' = if (enableManagedPrometheus) {
   name: 'simple-prometheus-alert-deployment'
   params: {
     location: location
@@ -199,9 +222,7 @@ module simplePrometheusAlert 'modules/simple-prometheus-alert.bicep' = if (enabl
   ]
 }
 
-var needsLaw = enableDiagnosticSettings || enableContainerInsights
-
-module logAnalytics 'modules/log-analytics.bicep' = if (needsLaw) {
+module logAnalytics 'modules/azure-monitor/log-analytics.bicep' = if (needsLaw) {
   name: 'log-analytics-deployment'
   params: {
     location: location
@@ -209,7 +230,7 @@ module logAnalytics 'modules/log-analytics.bicep' = if (needsLaw) {
   }
 }
 
-module diagnosticSettings 'modules/diagnostic-settings.bicep' = if (enableDiagnosticSettings) {
+module diagnosticSettings 'modules/azure-monitor/diagnostic-settings.bicep' = if (enableDiagnosticSettings) {
   name: 'diagnostic-settings-deployment'
   params: {
     aksClusterName: aksClusterName
@@ -220,7 +241,7 @@ module diagnosticSettings 'modules/diagnostic-settings.bicep' = if (enableDiagno
   ]
 }
 
-module containerInsightsWithManagedPrometheus 'modules/container-insights.bicep' = if (enableContainerInsights && enableManagedPrometheus) {
+module containerInsightsWithManagedPrometheus 'modules/azure-monitor/container-insights.bicep' = if (enableContainerInsights && enableManagedPrometheus) {
   name: 'container-insights-deployment-mp'
   params: {
     aksClusterName: aksClusterName
@@ -228,7 +249,6 @@ module containerInsightsWithManagedPrometheus 'modules/container-insights.bicep'
     dataCollectionEndpointName: containerInsightsDataCollectionEndpointName
     dataCollectionRuleName: containerInsightsDataCollectionRuleName
     logAnalyticsWorkspaceId: logAnalyticsWorkspaceResourceId
-    grafanaPrincipalId: grafana.outputs.grafanaPrincipalId
     existingDataCollectionEndpointId: managedPrometheusDataCollectionEndpointResourceId
   }
   dependsOn: [
@@ -238,7 +258,7 @@ module containerInsightsWithManagedPrometheus 'modules/container-insights.bicep'
   ]
 }
 
-module containerInsightsWithoutManagedPrometheus 'modules/container-insights.bicep' = if (enableContainerInsights && !enableManagedPrometheus) {
+module containerInsightsWithoutManagedPrometheus 'modules/azure-monitor/container-insights.bicep' = if (enableContainerInsights && !enableManagedPrometheus) {
   name: 'container-insights-deployment'
   params: {
     aksClusterName: aksClusterName
@@ -246,7 +266,6 @@ module containerInsightsWithoutManagedPrometheus 'modules/container-insights.bic
     dataCollectionEndpointName: containerInsightsDataCollectionEndpointName
     dataCollectionRuleName: containerInsightsDataCollectionRuleName
     logAnalyticsWorkspaceId: logAnalyticsWorkspaceResourceId
-    grafanaPrincipalId: grafana.outputs.grafanaPrincipalId
     existingDataCollectionEndpointId: ''
   }
   dependsOn: [
@@ -255,41 +274,63 @@ module containerInsightsWithoutManagedPrometheus 'modules/container-insights.bic
   ]
 }
 
-module roleAssignments 'modules/role-assignments.bicep' = {
-  name: 'role-assignments-deployment'
+module grafanaBindLaw 'modules/grafana/bind-law.bicep' = if (needsLaw) {
+  name: 'grafana-bind-law-deployment'
+  params: {
+    logAnalyticsWorkspaceName: logAnalyticsWorkspaceName
+    grafanaPrincipalId: grafana.outputs.grafanaPrincipalId
+  }
+  dependsOn: [
+    logAnalytics
+  ]
+}
+
+module adxRbac 'modules/adx/rbac.bicep' = {
+  name: 'adx-rbac-deployment'
   params: {
     adxClusterName: adx.outputs.adxName
-    adxMonAppId: identity.outputs.adxMonIdentityClientId
+    adxMonAppId: adxIdentity.outputs.adxMonIdentityClientId
     grafanaPrincipalId: grafana.outputs.grafanaPrincipalId
-    grafanaName: grafana.outputs.grafanaName
     viewerPrincipalIds: [for (upn, i) in userPrincipalNames: users[i].id]
   }
 }
 
-module k8sWorkloads 'modules/k8s-workloads.bicep' = {
+module grafanaAdminUsers 'modules/grafana/admin-rbac-users.bicep' = {
+  name: 'grafana-admin-users-deployment'
+  params: {
+    grafanaName: grafana.outputs.grafanaName
+    adminPrincipalIds: [for (upn, i) in userPrincipalNames: users[i].id]
+  }
+}
+
+module k8sWorkloads 'modules/adx/workloads.bicep' = {
   name: 'k8s-workloads-deployment'
   params: {
     location: location
     aksClusterName: aksClusterName
     adxUri: adx.outputs.adxUri
-    adxMonClientId: identity.outputs.adxMonIdentityClientId
-    deployerIdentityId: identity.outputs.deployerIdentityId
+    adxMonClientId: adxIdentity.outputs.adxMonIdentityClientId
+    aksScriptDeployerIdentityId: adxIdentity.outputs.aksScriptDeployerIdentityId
     forceScriptRerun: forceScriptRerun
   }
 }
 
-module grafanaConfig 'modules/grafana-config.bicep' = {
-  name: 'grafana-config-deployment'
+module grafanaAdxDatasource 'modules/grafana/bind-adx-datasource.bicep' = {
+  name: 'grafana-adx-datasource-deployment'
   params: {
     location: location
     grafanaName: grafana.outputs.grafanaName
     adxUri: adx.outputs.adxUri
     adxClusterName: adx.outputs.adxName
-    deployerIdentityId: identity.outputs.deployerIdentityId
-    deployerPrincipalId: identity.outputs.deployerPrincipalId
+    grafanaConfigDeployerIdentityId: grafanaConfigDeployerIdentity.outputs.grafanaConfigDeployerIdentityId
+    grafanaConfigDeployerPrincipalId: grafanaConfigDeployerIdentity.outputs.grafanaConfigDeployerPrincipalId
     forceScriptRerun: forceScriptRerun
     dashboardDefinitions: allDashboards
   }
+  dependsOn: [
+    adxRbac
+    grafanaAdminUsers
+  ]
 }
 
 output aksClusterName string = aksClusterName
@@ -303,4 +344,3 @@ output azureMonitorAlertPortalUrls array = enableManagedPrometheus ? [
   'https://portal.azure.com/#@${tenant().tenantId}/resource/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroup().name}/providers/Microsoft.AlertsManagement/prometheusRuleGroups/KubernetesAlert-RecommendedMetricAlerts${aksClusterName}-Pod-level/overview'
   'https://portal.azure.com/#@${tenant().tenantId}/resource/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroup().name}/providers/Microsoft.AlertsManagement/prometheusRuleGroups/DemoCustomAlertsRuleGroup-${aksClusterName}/overview'
 ] : []
-

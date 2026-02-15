@@ -17,11 +17,11 @@ param adxUri string
 @description('Name of the ADX cluster.')
 param adxClusterName string
 
-@description('Resource ID of the deployer managed identity.')
-param deployerIdentityId string
+@description('Resource ID of the Grafana config deployer managed identity.')
+param grafanaConfigDeployerIdentityId string
 
-@description('Principal ID of the deployer managed identity.')
-param deployerPrincipalId string
+@description('Principal ID of the Grafana config deployer managed identity.')
+param grafanaConfigDeployerPrincipalId string
 
 @description('Set to any unique value to force the deployment script to re-execute. Leave empty for normal behavior.')
 param forceScriptRerun string = ''
@@ -35,11 +35,11 @@ resource grafana 'Microsoft.Dashboard/grafana@2024-10-01' existing = {
 
 // Grant deployer identity Grafana Admin to configure datasource
 resource grafanaAdminRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(grafana.id, deployerPrincipalId, '22926164-76b3-42b3-bc55-97df8dab3e41')
+  name: guid(grafana.id, grafanaConfigDeployerPrincipalId, '22926164-76b3-42b3-bc55-97df8dab3e41')
   scope: grafana
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '22926164-76b3-42b3-bc55-97df8dab3e41')
-    principalId: deployerPrincipalId
+    principalId: grafanaConfigDeployerPrincipalId
     principalType: 'ServicePrincipal'
   }
 }
@@ -51,7 +51,7 @@ resource configScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
   identity: {
     type: 'UserAssigned'
     userAssignedIdentities: {
-      '${deployerIdentityId}': {}
+      '${grafanaConfigDeployerIdentityId}': {}
     }
   }
   dependsOn: [
