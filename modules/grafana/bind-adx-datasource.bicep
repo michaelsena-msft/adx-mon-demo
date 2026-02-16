@@ -33,12 +33,25 @@ resource grafana 'Microsoft.Dashboard/grafana@2024-10-01' existing = {
   name: grafanaName
 }
 
+var readerRoleDefinitionId = 'acdd72a7-3385-48ef-bd42-f606fba81ae7'
+
 // Grant deployer identity Grafana Admin to configure datasource
 resource grafanaAdminRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(grafana.id, grafanaConfigDeployerPrincipalId, '22926164-76b3-42b3-bc55-97df8dab3e41')
   scope: grafana
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '22926164-76b3-42b3-bc55-97df8dab3e41')
+    principalId: grafanaConfigDeployerPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Grant deployer identity ARM read permission on Grafana workspace resource
+resource grafanaReaderRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(grafana.id, grafanaConfigDeployerPrincipalId, readerRoleDefinitionId)
+  scope: grafana
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', readerRoleDefinitionId)
     principalId: grafanaConfigDeployerPrincipalId
     principalType: 'ServicePrincipal'
   }
@@ -56,6 +69,7 @@ resource configScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
   }
   dependsOn: [
     grafanaAdminRole
+    grafanaReaderRole
   ]
   properties: {
     azCliVersion: '2.63.0'

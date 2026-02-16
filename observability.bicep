@@ -336,7 +336,6 @@ module grafanaAdxDatasource 'modules/grafana/bind-adx-datasource.bicep' = {
 output aksClusterName string = aksClusterName
 output adxWebExplorerUrl string = 'https://dataexplorer.azure.com/clusters/${replace(adx.outputs.adxUri, 'https://', '')}'
 output grafanaEndpoint string = grafana.outputs.grafanaEndpoint
-output azureMonitorWorkspaceId string = enableManagedPrometheus ? azureMonitorWorkspaceResourceId : ''
 output logAnalyticsPortalUrl string = needsLaw ? 'https://portal.azure.com/#@${tenant().tenantId}/resource${logAnalyticsWorkspaceResourceId}/logs' : ''
 output azureMonitorAlertPortalUrls array = enableManagedPrometheus ? [
   'https://portal.azure.com/#@${tenant().tenantId}/resource/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroup().name}/providers/Microsoft.AlertsManagement/prometheusRuleGroups/KubernetesAlert-RecommendedMetricAlerts${aksClusterName}-Cluster-level/overview'

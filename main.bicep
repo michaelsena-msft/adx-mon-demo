@@ -144,9 +144,7 @@ module observability 'observability.bicep' = {
   ]
 }
 
-output aksClusterName string = aksClusterName
 output adxWebExplorerUrl string = observability.outputs.adxWebExplorerUrl
 output grafanaEndpoint string = observability.outputs.grafanaEndpoint
-output azureMonitorWorkspaceId string = observability.outputs.azureMonitorWorkspaceId
 output logAnalyticsPortalUrl string = observability.outputs.logAnalyticsPortalUrl
 output azureMonitorAlertPortalUrls array = observability.outputs.azureMonitorAlertPortalUrls

@@ -12,7 +12,7 @@ data:
     kubelet = true
     coredns = true
     cadvisor = true
-    kubeproxy = false
+    kubeproxy = true
     apiserver = true
     kubestate = true
     nodeexporter = true
