@@ -326,6 +326,7 @@ module grafanaAdxDatasource 'modules/grafana/bind-adx-datasource.bicep' = {
     grafanaConfigDeployerPrincipalId: grafanaConfigDeployerIdentity.outputs.grafanaConfigDeployerPrincipalId
     forceScriptRerun: forceScriptRerun
     dashboardDefinitions: allDashboards
+    logAnalyticsWorkspaceResourceId: logAnalyticsWorkspaceResourceId
   }
   dependsOn: [
     adxRbac

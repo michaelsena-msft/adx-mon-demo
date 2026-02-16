@@ -29,6 +29,9 @@ param forceScriptRerun string = ''
 @description('Dashboard definitions to provision. Each entry has a title and a JSON model object.')
 param dashboardDefinitions DashboardDefinition[] = []
 
+@description('Resource ID of the Log Analytics workspace used for dashboard log panels.')
+param logAnalyticsWorkspaceResourceId string = ''
+
 resource grafana 'Microsoft.Dashboard/grafana@2024-10-01' existing = {
   name: grafanaName
 }
@@ -82,6 +85,7 @@ resource configScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
       { name: 'ADX_URL', value: adxUri }
       { name: 'ADX_NAME', value: adxClusterName }
       { name: 'DASHBOARD_DEFINITIONS', value: string(dashboardDefinitions) }
+      { name: 'LAW_RESOURCE_ID', value: logAnalyticsWorkspaceResourceId }
     ]
     scriptContent: '''
       set -e
@@ -124,12 +128,21 @@ resource configScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
       # Provision dashboards if any are defined
       if [ "$DASHBOARD_DEFINITIONS" != "[]" ]; then
         echo "$DASHBOARD_DEFINITIONS" | python3 -c "
-import json, sys, subprocess
+import json, os, re, subprocess, sys
 defs = json.load(sys.stdin)
+law_resource_id = os.environ.get('LAW_RESOURCE_ID', '')
+hardcoded_law_id_pattern = re.compile(r'/subscriptions/[^"]+/resourceGroups/[^"]+/providers/Microsoft\\.OperationalInsights/workspaces/[^"]+', re.IGNORECASE)
 for d in defs:
     title = d['title']
-    model = json.dumps(d['definition'])
-    uid = d['definition'].get('uid', '')
+    definition = d['definition']
+    model = json.dumps(definition)
+    if hardcoded_law_id_pattern.search(model):
+        raise SystemExit(f'Dashboard {title!r} contains a hard-coded Log Analytics workspace resource ID. Use __LAW_RESOURCE_ID__.')
+    if '__LAW_RESOURCE_ID__' in model:
+        if not law_resource_id:
+            raise SystemExit(f'Dashboard {title!r} uses __LAW_RESOURCE_ID__ but LAW_RESOURCE_ID is empty.')
+        model = model.replace('__LAW_RESOURCE_ID__', law_resource_id)
+    uid = definition.get('uid', '')
     if uid:
         print(f'Deleting existing dashboard {uid} (if any)...')
         subprocess.run([

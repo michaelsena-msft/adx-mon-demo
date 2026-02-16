@@ -382,7 +382,7 @@
           "azureLogAnalytics": {
             "query": "ContainerLogV2\n| where PodNamespace == \"default\" and PodName startswith \"demo-app\"\n| project TimeGenerated, LogMessage, PodName, ContainerName\n| order by TimeGenerated desc\n| take 100",
             "resultFormat": "logs",
-            "resource": "/subscriptions/a7856baf-2b8e-485c-a7f9-a45544aaa20b/resourceGroups/rg-adx-mon/providers/Microsoft.OperationalInsights/workspaces/law-adx-mon"
+            "resource": "__LAW_RESOURCE_ID__"
           },
           "queryType": "Azure Log Analytics",
           "refId": "A"
