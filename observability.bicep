@@ -335,11 +335,9 @@ module grafanaAdxDatasource 'modules/grafana/bind-adx-datasource.bicep' = {
 
 output aksClusterName string = aksClusterName
 output adxWebExplorerUrl string = 'https://dataexplorer.azure.com/clusters/${replace(adx.outputs.adxUri, 'https://', '')}'
+output adxAlertDemoUrl string = 'https://dataexplorer.azure.com/clusters/${replace(adx.outputs.adxUri, 'https://', '')}/databases/Metrics?query=KubeStatePodStatusContainerRestartCount%0A%7C%20where%20Timestamp%20%3E%20ago%2810m%29%0A%7C%20invoke%20prom_delta%28%29%0A%7C%20summarize%20Restarts%3Dsum%28Value%29%20by%20Namespace%3Dtostring%28Labels.namespace%29%2C%20Pod%3Dtostring%28Labels.pod%29%0A%7C%20where%20Restarts%20%3E%203'
 output grafanaEndpoint string = grafana.outputs.grafanaEndpoint
 output logAnalyticsPortalUrl string = needsLaw ? 'https://portal.azure.com/#@${tenant().tenantId}/resource${logAnalyticsWorkspaceResourceId}/logs' : ''
 output azureMonitorAlertPortalUrls array = enableManagedPrometheus ? [
-  'https://portal.azure.com/#@${tenant().tenantId}/resource/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroup().name}/providers/Microsoft.AlertsManagement/prometheusRuleGroups/KubernetesAlert-RecommendedMetricAlerts${aksClusterName}-Cluster-level/overview'
-  'https://portal.azure.com/#@${tenant().tenantId}/resource/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroup().name}/providers/Microsoft.AlertsManagement/prometheusRuleGroups/KubernetesAlert-RecommendedMetricAlerts${aksClusterName}-Node-level/overview'
-  'https://portal.azure.com/#@${tenant().tenantId}/resource/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroup().name}/providers/Microsoft.AlertsManagement/prometheusRuleGroups/KubernetesAlert-RecommendedMetricAlerts${aksClusterName}-Pod-level/overview'
-  'https://portal.azure.com/#@${tenant().tenantId}/resource/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroup().name}/providers/Microsoft.AlertsManagement/prometheusRuleGroups/DemoCustomAlertsRuleGroup-${aksClusterName}/overview'
+  'https://portal.azure.com/#view/HubsExtension/BrowseResource/resourceType/Microsoft.AlertsManagement%2FprometheusRuleGroups'
 ] : []

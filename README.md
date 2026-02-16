@@ -209,10 +209,11 @@ This returns:
 |--------|-----|
 | `aksClusterName` | AKS cluster name (for `az aks get-credentials`) |
 | `adxWebExplorerUrl` | Query metrics and logs in the [ADX Web Explorer](https://learn.microsoft.com/en-us/azure/data-explorer/web-query-data) |
+| `adxAlertDemoUrl` | Open ADX with the sample alert query preloaded (demo of the ADX alert pathway) |
 | `grafanaEndpoint` | Build dashboards (you have Grafana Admin). Explore: append `/explore`. |
 | `azureMonitorWorkspaceId` | AMW resource ID (present when Managed Prometheus is enabled) |
 | `logAnalyticsPortalUrl` | Log Analytics query portal (present when Diagnostic Settings or Container Insights is enabled) |
-| `azureMonitorAlertPortalUrls` | Direct Azure portal URLs for all Azure Monitor Prometheus alert rule groups |
+| `azureMonitorAlertPortalUrls` | Azure portal browse URL for Prometheus rule groups (single URL entry) |
 
 ## Collecting Your Application Data
 

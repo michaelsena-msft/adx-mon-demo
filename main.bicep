@@ -51,6 +51,7 @@ module observability 'observability.bicep' = {
 }
 
 output adxWebExplorerUrl string = observability.outputs.adxWebExplorerUrl
+output adxAlertDemoUrl string = observability.outputs.adxAlertDemoUrl
 output grafanaEndpoint string = observability.outputs.grafanaEndpoint
 output logAnalyticsPortalUrl string = observability.outputs.logAnalyticsPortalUrl
 output azureMonitorAlertPortalUrls array = observability.outputs.azureMonitorAlertPortalUrls
