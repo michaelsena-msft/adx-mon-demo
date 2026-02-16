@@ -27,4 +27,12 @@ param alertOwnerIds = [
 // AKS resource name (default: aks-adx-mon)
 // param aksClusterName = 'aks-adx-mon'
 
+// Grafana workspace name must be globally unique across Azure.
+// Uncomment and set a unique value if deployment reports NameNotUnique.
+// param grafanaName = 'grafana-adx-mon-youralias'
+
+// ADX cluster name must be globally unique in the subscription.
+// Uncomment and set a unique value if deployment reports InvalidClusterName.
+// param adxClusterName = 'adxmonyouralias123'
+
 // For observability naming/tuning overrides, deploy observability.bicep directly.

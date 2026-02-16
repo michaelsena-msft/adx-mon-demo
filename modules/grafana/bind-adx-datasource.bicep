@@ -129,7 +129,7 @@ resource configScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
         }'
       fi
 
-      if [ "$IMPORT_MANAGED_PROM_DASHBOARDS" = "true" ]; then
+      if [ "$IMPORT_MANAGED_PROM_DASHBOARDS" = "true" ] || [ "$IMPORT_MANAGED_PROM_DASHBOARDS" = "True" ]; then
         echo "Importing managed Prometheus control-plane dashboards (20331, 20330)..."
         az grafana dashboard import -n "$GRAFANA_NAME" -g "$GRAFANA_RG" --definition 20331 --overwrite true
         az grafana dashboard import -n "$GRAFANA_NAME" -g "$GRAFANA_RG" --definition 20330 --overwrite true
@@ -137,9 +137,11 @@ resource configScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
 
       # Provision dashboards if any are defined
       if [ "$DASHBOARD_DEFINITIONS" != "[]" ]; then
-        echo "$DASHBOARD_DEFINITIONS" | python3 -c "
-import json, os, re, subprocess, sys
-defs = json.load(sys.stdin)
+        python3 - <<'PY'
+import json, os, re, subprocess
+defs = json.loads(os.environ['DASHBOARD_DEFINITIONS'])
+grafana_name = os.environ['GRAFANA_NAME']
+grafana_rg = os.environ['GRAFANA_RG']
 law_resource_id = os.environ.get('LAW_RESOURCE_ID', '')
 hardcoded_law_id_pattern = re.compile(r'/subscriptions/[^"]+/resourceGroups/[^"]+/providers/Microsoft\\.OperationalInsights/workspaces/[^"]+', re.IGNORECASE)
 for d in defs:
@@ -157,17 +159,17 @@ for d in defs:
         print(f'Deleting existing dashboard {uid} (if any)...')
         subprocess.run([
             'az', 'grafana', 'dashboard', 'delete',
-            '-n', '$GRAFANA_NAME', '-g', '$GRAFANA_RG',
+            '-n', grafana_name, '-g', grafana_rg,
             '--dashboard', uid
         ], capture_output=True)
     print(f'Creating dashboard: {title}')
     subprocess.run([
         'az', 'grafana', 'dashboard', 'create',
-        '-n', '$GRAFANA_NAME', '-g', '$GRAFANA_RG',
+        '-n', grafana_name, '-g', grafana_rg,
         '--title', title,
         '--definition', model
     ], check=True)
-"
+PY
         echo "Dashboard provisioning complete."
       fi
 

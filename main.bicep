@@ -14,6 +14,13 @@ param location string = 'eastus2'
 @description('Name of the AKS managed cluster.')
 param aksClusterName string = 'aks-adx-mon'
 
+@description('Name of the Managed Grafana workspace.')
+param grafanaName string = 'grafana-adx-mon'
+
+@description('Globally unique name for the ADX cluster.')
+@maxLength(22)
+param adxClusterName string = 'adxmon${uniqueString(subscription().id)}'
+
 @description('Email receivers for the Action Group used by alert rules.')
 param alertEmailReceivers AlertEmailReceiver[]
 
@@ -42,6 +49,8 @@ module observability 'observability.bicep' = {
   params: {
     location: location
     aksClusterResourceId: aksResourceId
+    adxClusterName: adxClusterName
+    grafanaName: grafanaName
     alertEmailReceivers: alertEmailReceivers
     alertOwnerIds: alertOwnerIds
   }
