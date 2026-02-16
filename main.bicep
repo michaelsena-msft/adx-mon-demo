@@ -14,6 +14,12 @@ param location string = 'eastus2'
 @description('Name of the AKS managed cluster.')
 param aksClusterName string = 'aks-adx-mon'
 
+@description('VM size for the AKS system node pool.')
+param nodeVmSize string = 'Standard_D4s_v3'
+
+@description('Number of nodes in the AKS system node pool.')
+param nodeCount int = 2
+
 @description('Name of the Managed Grafana workspace.')
 param grafanaName string = 'grafana-adx-mon'
 
@@ -38,6 +44,8 @@ module aks 'modules/aks.bicep' = {
   params: {
     clusterName: aksClusterName
     location: location
+    nodeVmSize: nodeVmSize
+    nodeCount: nodeCount
   }
 }
 

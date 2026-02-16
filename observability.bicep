@@ -95,6 +95,10 @@ resource users 'Microsoft.Graph/users@v1.0' existing = [for upn in userPrincipal
   userPrincipalName: upn
 }]
 
+var aksIdentityType = aksCluster.identity.type
+var aksDnsPrefix = aksCluster.properties.dnsPrefix
+var aksAgentPoolProfiles = aksCluster.properties.agentPoolProfiles
+
 var demoAppDashboardJson = loadJsonContent('dashboards/demo-app.json')
 var defaultDashboards = [
   {
@@ -153,6 +157,9 @@ module managedPrometheus 'modules/azure-monitor/managed-prometheus.bicep' = if (
   params: {
     location: location
     aksClusterName: aksClusterName
+    aksIdentityType: aksIdentityType
+    aksDnsPrefix: aksDnsPrefix
+    aksAgentPoolProfiles: aksAgentPoolProfiles
     azureMonitorWorkspaceName: azureMonitorWorkspaceName
     dataCollectionEndpointName: managedPrometheusDataCollectionEndpointName
     dataCollectionRuleName: managedPrometheusDataCollectionRuleName
@@ -245,6 +252,9 @@ module containerInsightsWithManagedPrometheus 'modules/azure-monitor/container-i
   name: 'container-insights-deployment-mp'
   params: {
     aksClusterName: aksClusterName
+    aksIdentityType: aksIdentityType
+    aksDnsPrefix: aksDnsPrefix
+    aksAgentPoolProfiles: aksAgentPoolProfiles
     location: location
     dataCollectionEndpointName: containerInsightsDataCollectionEndpointName
     dataCollectionRuleName: containerInsightsDataCollectionRuleName
@@ -262,6 +272,9 @@ module containerInsightsWithoutManagedPrometheus 'modules/azure-monitor/containe
   name: 'container-insights-deployment'
   params: {
     aksClusterName: aksClusterName
+    aksIdentityType: aksIdentityType
+    aksDnsPrefix: aksDnsPrefix
+    aksAgentPoolProfiles: aksAgentPoolProfiles
     location: location
     dataCollectionEndpointName: containerInsightsDataCollectionEndpointName
     dataCollectionRuleName: containerInsightsDataCollectionRuleName

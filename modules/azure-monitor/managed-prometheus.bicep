@@ -4,6 +4,15 @@ param location string
 @description('Name of the existing AKS cluster to enable Prometheus metrics on.')
 param aksClusterName string
 
+@description('Identity type of the existing AKS cluster.')
+param aksIdentityType string = 'SystemAssigned'
+
+@description('DNS prefix of the existing AKS cluster.')
+param aksDnsPrefix string
+
+@description('Agent pool profiles of the existing AKS cluster.')
+param aksAgentPoolProfiles array
+
 @description('Name of the Azure Monitor Workspace.')
 param azureMonitorWorkspaceName string
 
@@ -92,7 +101,12 @@ resource dcrAssociation 'Microsoft.Insights/dataCollectionRuleAssociations@2024-
 resource aksMetricsUpdate 'Microsoft.ContainerService/managedClusters@2024-09-01' = {
   name: aksClusterName
   location: location
+  identity: {
+    type: aksIdentityType
+  }
   properties: {
+    dnsPrefix: aksDnsPrefix
+    agentPoolProfiles: aksAgentPoolProfiles
     azureMonitorProfile: {
       metrics: {
         enabled: true

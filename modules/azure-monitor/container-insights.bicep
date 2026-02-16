@@ -1,6 +1,15 @@
 @description('Name of the existing AKS cluster.')
 param aksClusterName string
 
+@description('Identity type of the existing AKS cluster.')
+param aksIdentityType string = 'SystemAssigned'
+
+@description('DNS prefix of the existing AKS cluster.')
+param aksDnsPrefix string
+
+@description('Agent pool profiles of the existing AKS cluster.')
+param aksAgentPoolProfiles array
+
 @description('Azure region for all resources.')
 param location string
 
@@ -106,7 +115,12 @@ resource dcrAssociation 'Microsoft.Insights/dataCollectionRuleAssociations@2024-
 resource aksMonitoringUpdate 'Microsoft.ContainerService/managedClusters@2024-09-01' = {
   name: aksClusterName
   location: location
+  identity: {
+    type: aksIdentityType
+  }
   properties: {
+    dnsPrefix: aksDnsPrefix
+    agentPoolProfiles: aksAgentPoolProfiles
     addonProfiles: {
       omsagent: {
         enabled: true

@@ -26,6 +26,9 @@ param alertOwnerIds = [
 
 // AKS resource name (default: aks-adx-mon)
 // param aksClusterName = 'aks-adx-mon'
+// If subscription quota is constrained, reduce AKS nodes for test runs:
+// param nodeCount = 1
+// param nodeVmSize = 'Standard_D4s_v3'
 
 // Grafana workspace name must be globally unique across Azure.
 // Uncomment and set a unique value if deployment reports NameNotUnique.
