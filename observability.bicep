@@ -327,10 +327,12 @@ module grafanaAdxDatasource 'modules/grafana/bind-adx-datasource.bicep' = {
     forceScriptRerun: forceScriptRerun
     dashboardDefinitions: allDashboards
     logAnalyticsWorkspaceResourceId: logAnalyticsWorkspaceResourceId
+    importManagedPrometheusDashboards: enableManagedPrometheus
   }
   dependsOn: [
     adxRbac
     grafanaAdminUsers
+    grafanaBindAmw
   ]
 }
 

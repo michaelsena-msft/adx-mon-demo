@@ -14,6 +14,8 @@ data:
     cadvisor = true
     kubeproxy = true
     apiserver = true
+    controlplane-apiserver = true
+    controlplane-etcd = true
     kubestate = true
     nodeexporter = true
     windowsexporter = false
@@ -31,6 +33,8 @@ data:
     cadvisor = "30s"
     kubeproxy = "30s"
     apiserver = "30s"
+    controlplane-apiserver = "30s"
+    controlplane-etcd = "30s"
     kubestate = "30s"
     nodeexporter = "30s"
     podannotations = "30s"

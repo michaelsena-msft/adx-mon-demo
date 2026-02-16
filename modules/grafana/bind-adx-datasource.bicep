@@ -32,6 +32,9 @@ param dashboardDefinitions DashboardDefinition[] = []
 @description('Resource ID of the Log Analytics workspace used for dashboard log panels.')
 param logAnalyticsWorkspaceResourceId string = ''
 
+@description('Import managed Prometheus control-plane dashboards (20331 API server, 20330 etcd).')
+param importManagedPrometheusDashboards bool = false
+
 resource grafana 'Microsoft.Dashboard/grafana@2024-10-01' existing = {
   name: grafanaName
 }
@@ -86,6 +89,7 @@ resource configScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
       { name: 'ADX_NAME', value: adxClusterName }
       { name: 'DASHBOARD_DEFINITIONS', value: string(dashboardDefinitions) }
       { name: 'LAW_RESOURCE_ID', value: logAnalyticsWorkspaceResourceId }
+      { name: 'IMPORT_MANAGED_PROM_DASHBOARDS', value: string(importManagedPrometheusDashboards) }
     ]
     scriptContent: '''
       set -e
@@ -123,6 +127,12 @@ resource configScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
           "access":"proxy",
           "jsonData":{"clusterUrl":"'"$ADX_URL"'"}
         }'
+      fi
+
+      if [ "$IMPORT_MANAGED_PROM_DASHBOARDS" = "true" ]; then
+        echo "Importing managed Prometheus control-plane dashboards (20331, 20330)..."
+        az grafana dashboard import -n "$GRAFANA_NAME" -g "$GRAFANA_RG" --definition 20331 --overwrite true
+        az grafana dashboard import -n "$GRAFANA_NAME" -g "$GRAFANA_RG" --definition 20330 --overwrite true
       fi
 
       # Provision dashboards if any are defined
