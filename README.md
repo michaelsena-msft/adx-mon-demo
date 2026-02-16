@@ -137,15 +137,10 @@ cp main.sample.bicepparam main.bicepparam
 ```
 
 Edit `main.bicepparam`:
-- add your user UPN(s) for **ADX Viewer + Grafana Admin**
 - set one or more **alert email receivers** for Azure Monitor alerts (Action Group is created by this deployment)
 - set one or more **alert owner/contact identifiers**
 
 ```bicep
-param userPrincipalNames = [
-  'yourname@yourtenant.onmicrosoft.com'
-]
-
 param alertEmailReceivers = [
   {
     name: 'primary'
@@ -158,9 +153,9 @@ param alertOwnerIds = [
 ]
 ```
 
-The [Microsoft Graph Bicep extension](https://learn.microsoft.com/graph/templates/bicep/whats-new)
-resolves email addresses to object IDs at deploy time — no need to look up GUIDs manually.
-Each listed user gets **ADX Viewer** (on both Metrics and Logs databases) and **Grafana Admin**.
+`main.bicep` intentionally keeps a lean parameter surface. For access grants and advanced observability
+overrides (for example `userPrincipalNames`, `forceScriptRerun`, feature toggles, and custom dashboards),
+deploy `observability.bicep` directly.
 
 ### 2. Deploy
 
@@ -189,18 +184,6 @@ Update deploys (no-change or parameter-only changes) take **~4–5 minutes** —
 are skipped automatically when their inputs haven't changed.
 
 > **Tip**: Add `--no-wait` to return immediately and monitor via `az deployment sub show --name adxmon-deploy`.
-
-> **Force script re-execution**: If you need to reconcile out-of-band drift (e.g. someone manually
-> edited K8s resources or Grafana dashboards), force both deployment scripts to re-run:
->
-> ```bash
-> az deployment sub create \
->   --location eastus2 \
->   --template-file main.bicep \
->   --parameters main.bicepparam \
->   --parameters forceScriptRerun=$(date -u +%Y%m%dT%H%M%SZ) \
->   --name adxmon-deploy
-> ```
 
 > **Faster iterative deploys** (Azure CLI 2.76+): Skip full RBAC preflight validation with
 > `--validation-level ProviderNoRbac` to save a few seconds per deployment:
@@ -269,7 +252,7 @@ annotations:
 [Managed Prometheus](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/prometheus-metrics-overview)
 can run **alongside** adx-mon — both scrape the same Prometheus endpoints independently.
 
-To disable:
+To disable (when deploying `observability.bicep` directly):
 ```bicep
 param enableManagedPrometheus = false
 ```
@@ -314,7 +297,7 @@ Send AKS control-plane logs to a [Log Analytics workspace](https://learn.microso
 for audit and troubleshooting. [Microsoft recommends](https://learn.microsoft.com/en-us/azure/aks/monitor-aks#azure-monitor-resource-logs)
 enabling this for all AKS clusters.
 
-To disable:
+To disable (when deploying `observability.bicep` directly):
 ```bicep
 param enableDiagnosticSettings = false
 ```
@@ -331,7 +314,7 @@ When enabled, Bicep deploys a Log Analytics workspace and configures these categ
 collects container logs and Kubernetes inventory data to a Log Analytics workspace — the log equivalent of what
 [Managed Prometheus](#managed-prometheus-enabled-by-default) does for metrics.
 
-To disable:
+To disable (when deploying `observability.bicep` directly):
 ```bicep
 param enableContainerInsights = false
 ```
@@ -370,8 +353,10 @@ A bundled **Demo App** dashboard is deployed automatically with panels arranged 
 | Container Memory | — | Demo App Logs (`ContainerLogV2`) |
 | Demo App Logs (ADX) | — | — |
 
-The dashboard JSON lives in `dashboards/demo-app.json`. To add your own dashboards, pass
+The dashboard JSON lives in `dashboards/demo-app.json`. To add your own dashboards (when deploying `observability.bicep` directly), pass
 `dashboardDefinitions` — an array of `{ title, definition }` objects:
+
+> The built-in Container Insights panel uses a `__LAW_RESOURCE_ID__` placeholder, replaced at deployment time with the current Log Analytics workspace resource ID.
 
 ```bicep
 param dashboardDefinitions = [
