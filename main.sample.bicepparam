@@ -3,6 +3,13 @@ using 'main.bicep'
 // SAMPLE ONLY: Copy to main.bicepparam and replace placeholder values.
 // Do NOT commit real parameter values.
 
+// ---------- Access (recommended) ----------
+
+// User principal names (aliases or UPNs) to grant ADX Viewer + Grafana Admin access.
+param userPrincipalNames = [
+  ''
+]
+
 // ---------- Alerts (required) ----------
 
 // Email receivers for Azure Monitor alert notifications (Action Group is created by this deployment).

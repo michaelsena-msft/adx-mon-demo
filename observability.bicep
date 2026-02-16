@@ -58,7 +58,7 @@ param adxSkuName string = 'Standard_E2ads_v5'
 @description('SKU capacity (instance count) for the ADX cluster.')
 param adxSkuCapacity int = 2
 
-@description('User principal names (UPN emails) to grant ADX Viewer and Grafana Admin access. For TME tenant, use alias@tme01.onmicrosoft.com.')
+@description('User principal names to grant ADX Viewer and Grafana Admin access. For TME, aliases are supported and normalized to alias@tme01.onmicrosoft.com.')
 param userPrincipalNames string[] = []
 
 @description('Set to any unique value (e.g. a timestamp) to force deployment scripts to re-execute. Leave empty for normal behavior — scripts only rerun when their inputs change.')
@@ -91,7 +91,9 @@ resource aksCluster 'Microsoft.ContainerService/managedClusters@2024-09-01' exis
   name: aksClusterName
 }
 
-resource users 'Microsoft.Graph/users@v1.0' existing = [for upn in userPrincipalNames: {
+var resolvedUserPrincipalNames = [for principal in userPrincipalNames: contains(principal, '@') ? principal : '${principal}@tme01.onmicrosoft.com']
+
+resource users 'Microsoft.Graph/users@v1.0' existing = [for upn in resolvedUserPrincipalNames: {
   userPrincipalName: upn
 }]
 

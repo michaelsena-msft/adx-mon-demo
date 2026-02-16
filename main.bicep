@@ -33,6 +33,9 @@ param alertEmailReceivers AlertEmailReceiver[]
 @description('Alert owner/contact identifiers used as alert metadata (for example: aliases).')
 param alertOwnerIds string[]
 
+@description('User principal names to grant ADX Viewer and Grafana Admin access.')
+param userPrincipalNames string[] = []
+
 resource rg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
   name: resourceGroupName
   location: location
@@ -61,6 +64,7 @@ module observability 'observability.bicep' = {
     grafanaName: grafanaName
     alertEmailReceivers: alertEmailReceivers
     alertOwnerIds: alertOwnerIds
+    userPrincipalNames: userPrincipalNames
   }
   dependsOn: [
     aks
