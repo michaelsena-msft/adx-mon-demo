@@ -1,10 +1,10 @@
 # adx-mon Bicep Demo
 
-Deploy [adx-mon](https://github.com/Azure/adx-mon) on AKS with two observability pathways.
+Deploy [adx-mon](https://github.com/Azure/adx-mon) on [Azure Kubernetes Service (AKS)](https://learn.microsoft.com/en-us/azure/aks/) with two observability pathways.
 This demo is about viewing the same AKS workload signals through both pathways, then comparing in Grafana.
 
 - **ADX/Kusto pathway**: adx-mon Collector/Ingestor writes metrics and logs to [Azure Data Explorer (ADX)](https://learn.microsoft.com/en-us/azure/data-explorer/).
-- **Azure Monitor pathway**: AKS managed Prometheus pipeline writes metrics to an [Azure Monitor Workspace](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/azure-monitor-workspace-overview) with alerting and Grafana integration.
+- **Azure Monitor pathway**: AKS [Azure Monitor managed service for Prometheus](https://learn.microsoft.com/azure/azure-monitor/metrics/prometheus-metrics-overview) writes metrics to an [Azure Monitor Workspace](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/azure-monitor-workspace-overview) with alerting and [Azure Managed Grafana](https://learn.microsoft.com/azure/managed-grafana/overview) integration.
 
 ## Architecture
 
@@ -64,23 +64,20 @@ Use `adxAlertDemoUrl` for the sample alert query deep link (`adxWebExplorerUrl` 
 
 ### Azure Monitor
 
-Implemented by [`modules/azure-monitor`](modules/azure-monitor): managed Prometheus collection, recording rules, metric alerting, diagnostic settings, and Container Insights.
-AKS advanced networking observability (ACNS) is enabled in [`modules/aks.bicep`](modules/aks.bicep) and contributes networking signals to the Azure Monitor pathway.
+Implemented by [`modules/azure-monitor`](modules/azure-monitor): managed Prometheus collection, recording rules, [recommended (out-of-the-box) alert rules](https://learn.microsoft.com/azure/azure-monitor/containers/kubernetes-metric-alerts), [diagnostic settings](https://learn.microsoft.com/azure/azure-monitor/platform/diagnostic-settings), and [Container insights](https://learn.microsoft.com/azure/azure-monitor/containers/kubernetes-monitoring-overview).
+AKS [Advanced Container Networking Services (ACNS) observability](https://learn.microsoft.com/azure/aks/advanced-container-networking-services-overview#container-network-observability) is enabled in [`modules/aks.bicep`](modules/aks.bicep) and contributes networking signals to the Azure Monitor pathway.
 
-Use output `azureMonitorAlertPortalUrls[0]` for the portal browse location of Prometheus rule groups:
-`https://portal.azure.com/#view/HubsExtension/BrowseResource/resourceType/Microsoft.AlertsManagement%2FprometheusRuleGroups`
+Use output `azureMonitorAlertPortalUrls[0]` for the Azure portal browse location of [Prometheus rule groups](https://learn.microsoft.com/azure/azure-monitor/metrics/prometheus-rule-groups).
 
-Also in the Azure Monitor side of this deployment (logs/inventory):
+Azure Monitor also includes these logs and inventory integrations:
 
-- [`diagnostic-settings.bicep`](modules/azure-monitor/diagnostic-settings.bicep): AKS control-plane resource logs to Log Analytics.
+- [`diagnostic-settings.bicep`](modules/azure-monitor/diagnostic-settings.bicep): AKS control-plane resource logs to a [Log Analytics workspace](https://learn.microsoft.com/azure/azure-monitor/logs/log-analytics-workspace-overview).
 - [`container-insights.bicep`](modules/azure-monitor/container-insights.bicep): `ContainerLogV2`, `KubePodInventory`, `KubeEvents` via `ama-logs`.
 - [`k8s/ama-metrics-settings.yaml`](k8s/ama-metrics-settings.yaml): metrics scrape profile (including baseline control-plane targets `controlplane-apiserver` and `controlplane-etcd`) and pod-annotation scraping settings used by Azure Monitor metrics collection.
 
 #### Enabling More Data
 
-Want more control-plane metrics? Review the available targets in Microsoft documentation, then add the targets you want under `default-scrape-settings-enabled` in [`k8s/ama-metrics-settings.yaml`](k8s/ama-metrics-settings.yaml).
-
-- Docs: https://learn.microsoft.com/azure/aks/control-plane-metrics-monitor#customize-control-plane-metrics
+Want more control-plane metrics? Review the available targets in [Customize control plane metrics in AKS](https://learn.microsoft.com/azure/aks/control-plane-metrics-monitor#customize-control-plane-metrics), then add the targets you want under `default-scrape-settings-enabled` in [`k8s/ama-metrics-settings.yaml`](k8s/ama-metrics-settings.yaml).
 
 ## Deployment Outputs (demo-first)
 
@@ -103,7 +100,7 @@ Additional outputs are still available from `az deployment ... --query 'properti
 
 [`dashboards/demo-app.json`](dashboards/demo-app.json) is provisioned by default through [`modules/grafana/bind-adx-datasource.bicep`](modules/grafana/bind-adx-datasource.bicep).
 When Managed Prometheus is enabled, deployment also imports Grafana gallery dashboards:
-- API server: https://grafana.com/grafana/dashboards/20331-kubernetes-api-server/
-- etcd: https://grafana.com/grafana/dashboards/20330-kubernetes-etcd/
+- [Kubernetes API Server dashboard](https://grafana.com/grafana/dashboards/20331-kubernetes-api-server/)
+- [Kubernetes etcd dashboard](https://grafana.com/grafana/dashboards/20330-kubernetes-etcd/)
 
 For additional dashboards, set `dashboardDefinitions` in [`observability.bicep`](observability.bicep).
