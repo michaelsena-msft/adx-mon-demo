@@ -74,19 +74,36 @@ Also in the Azure Monitor side of this deployment (logs/inventory):
 
 - [`diagnostic-settings.bicep`](modules/azure-monitor/diagnostic-settings.bicep): AKS control-plane resource logs to Log Analytics.
 - [`container-insights.bicep`](modules/azure-monitor/container-insights.bicep): `ContainerLogV2`, `KubePodInventory`, `KubeEvents` via `ama-logs`.
-- [`k8s/ama-metrics-settings.yaml`](k8s/ama-metrics-settings.yaml): metrics scrape profile and pod-annotation scraping settings used by Azure Monitor metrics collection.
+- [`k8s/ama-metrics-settings.yaml`](k8s/ama-metrics-settings.yaml): metrics scrape profile (including baseline control-plane targets `controlplane-apiserver` and `controlplane-etcd`) and pod-annotation scraping settings used by Azure Monitor metrics collection.
+
+#### Enabling More Data
+
+Want more control-plane metrics? Review the available targets in Microsoft documentation, then add the targets you want under `default-scrape-settings-enabled` in [`k8s/ama-metrics-settings.yaml`](k8s/ama-metrics-settings.yaml).
+
+- Docs: https://learn.microsoft.com/azure/aks/control-plane-metrics-monitor#customize-control-plane-metrics
 
 ## Deployment Outputs (demo-first)
 
 | Output | Use |
 | --- | --- |
+| `adxWebExplorerUrl` | ADX web UI entry point (queries + native dashboards) |
 | `adxAlertDemoUrl` | ADX sample alert query deep link |
 | `grafanaEndpoint` | Managed Grafana endpoint |
 | `azureMonitorAlertPortalUrls[0]` | Azure portal browse URL for Prometheus rule groups |
 
 Additional outputs are still available from `az deployment ... --query 'properties.outputs'`.
 
+## ADX Dashboards (native)
+
+- Open `adxWebExplorerUrl`, then use **Dashboards** in the ADX web UI.
+- The ADX web UI includes a samples gallery with built-in dashboard examples.
+- This deployment does not auto-provision a cluster-specific ADX dashboard pack in ADX.
+
 ## Grafana Dashboards
 
 [`dashboards/demo-app.json`](dashboards/demo-app.json) is provisioned by default through [`modules/grafana/bind-adx-datasource.bicep`](modules/grafana/bind-adx-datasource.bicep).
+When Managed Prometheus is enabled, deployment also imports Grafana gallery dashboards:
+- API server: https://grafana.com/grafana/dashboards/20331-kubernetes-api-server/
+- etcd: https://grafana.com/grafana/dashboards/20330-kubernetes-etcd/
+
 For additional dashboards, set `dashboardDefinitions` in [`observability.bicep`](observability.bicep).
